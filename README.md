@@ -30,7 +30,7 @@ pi install npm:pi-prompton
 Install from git:
 
 ```bash
-pi install git:github.com/ayagmar/pi-prompton
+pi install git:github.com/the-matt-moo/pi-prompton
 ```
 
 ## Quick start
@@ -299,7 +299,7 @@ Enhancer model modes: `active`, `fixed`, `family-linked`.
 ## Development
 
 ```bash
-git clone https://github.com/ayagmar/pi-prompton.git
+git clone https://github.com/the-matt-moo/pi-prompton.git
 cd pi-prompton
 pnpm install
 pnpm run check

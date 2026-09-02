@@ -35,15 +35,15 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/ayagmar/pi-prompton/main/prompton.gif"
+    "image": "https://raw.githubusercontent.com/the-matt-moo/pi-prompton/main/assets/pi_prompton_social_card.jpg"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ayagmar/pi-prompton.git"
+    "url": "git+https://github.com/the-matt-moo/pi-prompton.git"
   },
-  "homepage": "https://github.com/ayagmar/pi-prompton#readme",
+  "homepage": "https://github.com/the-matt-moo/pi-prompton#readme",
   "bugs": {
-    "url": "https://github.com/ayagmar/pi-prompton/issues"
+    "url": "https://github.com/the-matt-moo/pi-prompton/issues"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
