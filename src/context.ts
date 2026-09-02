@@ -13,19 +13,19 @@ import type {
   BuildPromptContextOptions,
   ConversationExcerpt,
   ProjectMetadata,
-  PromptsmithContextPayload,
+  PromptonContextPayload,
 } from "./types.js";
 
 export async function buildPromptContext(
   options: BuildPromptContextOptions
-): Promise<PromptsmithContextPayload> {
+): Promise<PromptonContextPayload> {
   const { ctx, draft, settings, activeModel, targetFamily, enhancerModel } = options;
   const safeInputBudget = computeSafeInputBudget(enhancerModel);
   const draftTokens = estimateTextTokens(draft);
 
   if (draftTokens + ESTIMATED_FIXED_PROMPT_OVERHEAD_TOKENS > safeInputBudget) {
     throw new Error(
-      `Promptsmith cannot safely enhance this draft with ${enhancerModel.provider}/${enhancerModel.id} because the editor text is too large.`
+      `Prompton cannot safely enhance this draft with ${enhancerModel.provider}/${enhancerModel.id} because the editor text is too large.`
     );
   }
 
@@ -190,6 +190,6 @@ function normalizeExcerptText(text: string): string {
     .replace(/\n{3,}/g, "\n\n");
 }
 
-function estimateTextTokens(text: string): number {
+export function estimateTextTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }

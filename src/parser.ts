@@ -6,12 +6,12 @@ export type InvalidModelOutputReason =
   | "text-outside-sentinel-block"
   | "empty-enhanced-prompt";
 
-const INVALID_MODEL_OUTPUT_PREFIX = "Promptsmith received invalid model output";
+const INVALID_MODEL_OUTPUT_PREFIX = "Prompton received invalid model output";
 
-export class PromptsmithInvalidModelOutputError extends Error {
+export class PromptonInvalidModelOutputError extends Error {
   constructor(readonly reason: InvalidModelOutputReason) {
     super(`${INVALID_MODEL_OUTPUT_PREFIX}: ${describeInvalidModelOutputReason(reason)}.`);
-    this.name = "PromptsmithInvalidModelOutputError";
+    this.name = "PromptonInvalidModelOutputError";
   }
 }
 
@@ -22,27 +22,27 @@ export function parseEnhancedPrompt(responseText: string): string {
   const matches = [...responseText.matchAll(pattern)];
 
   if (matches.length === 0) {
-    throw new PromptsmithInvalidModelOutputError("missing-sentinel-block");
+    throw new PromptonInvalidModelOutputError("missing-sentinel-block");
   }
 
   if (matches.length > 1) {
-    throw new PromptsmithInvalidModelOutputError("multiple-sentinel-blocks");
+    throw new PromptonInvalidModelOutputError("multiple-sentinel-blocks");
   }
 
   const match = matches[0];
   if (!match) {
-    throw new PromptsmithInvalidModelOutputError("missing-sentinel-block");
+    throw new PromptonInvalidModelOutputError("missing-sentinel-block");
   }
 
   const before = responseText.slice(0, match.index ?? 0).trim();
   const after = responseText.slice((match.index ?? 0) + match[0].length).trim();
   if (before || after) {
-    throw new PromptsmithInvalidModelOutputError("text-outside-sentinel-block");
+    throw new PromptonInvalidModelOutputError("text-outside-sentinel-block");
   }
 
   const extracted = normalizePromptText(match[1] ?? "");
   if (!extracted.trim()) {
-    throw new PromptsmithInvalidModelOutputError("empty-enhanced-prompt");
+    throw new PromptonInvalidModelOutputError("empty-enhanced-prompt");
   }
 
   return extracted;
@@ -54,8 +54,8 @@ export function buildSentinelReminder(): string {
 
 export function isInvalidModelOutputError(
   error: unknown
-): error is PromptsmithInvalidModelOutputError {
-  return error instanceof PromptsmithInvalidModelOutputError;
+): error is PromptonInvalidModelOutputError {
+  return error instanceof PromptonInvalidModelOutputError;
 }
 
 export function describeInvalidModelOutputReason(reason: InvalidModelOutputReason): string {

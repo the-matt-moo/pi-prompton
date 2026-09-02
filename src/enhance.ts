@@ -9,24 +9,24 @@ import type {
 import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { BorderedLoader } from "@earendil-works/pi-coding-agent";
-import { buildPromptContext } from "./context.js";
+import { buildPromptContext, estimateTextTokens } from "./context.js";
 import { resolveEditorDraft } from "./editor-draft.js";
+import { clarifyDraft } from "./clarify.js";
 import { resolveEnhancerModel } from "./model-selection.js";
 import { resolveTargetFamily } from "./model-routing.js";
 import {
   buildSentinelReminder,
   describeInvalidModelOutputReason,
   isInvalidModelOutputError,
-  type PromptsmithInvalidModelOutputError,
+  type PromptonInvalidModelOutputError,
   parseEnhancedPrompt,
 } from "./parser.js";
-import type { PromptsmithRuntimeState } from "./state.js";
-import { buildClaudeStrategyRequest } from "./strategies/claude.js";
-import { buildGptStrategyRequest } from "./strategies/gpt.js";
+import type { PromptonRuntimeState } from "./state.js";
+import { buildStrategyRequest } from "./strategies/unified.js";
 import type {
   EnhancementPreparation,
-  PromptsmithEnhancementAttempt,
-  PromptsmithSettings,
+  PromptonEnhancementAttempt,
+  PromptonSettings,
 } from "./types.js";
 import {
   detectRuntimeSupport,
@@ -63,8 +63,9 @@ interface EnhancementAttemptTracker {
 
 export async function enhanceEditorDraft(
   ctx: ExtensionContext,
-  runtime: PromptsmithRuntimeState,
-  services: EnhancementServices
+  runtime: PromptonRuntimeState,
+  services: EnhancementServices,
+  options: { clarify?: boolean } = {}
 ): Promise<void> {
   const support = detectRuntimeSupport(ctx);
   if (!support.interactiveTui) {
@@ -74,16 +75,31 @@ export async function enhanceEditorDraft(
   const settings = runtime.getSettings();
   ensureEnhancementEnabled(settings);
 
-  const draft = await resolveEditorDraft(ctx, services.exec);
+  if (runtime.isBusy()) {
+    throw new Error("Prompton is already enhancing the editor draft.");
+  }
+
+  let draft = await resolveEditorDraft(ctx, services.exec);
   requireNonEmptyDraft(draft);
 
+  if (options.clarify ?? settings.clarifyEnabled) {
+    const refined = await clarifyDraft(ctx, draft);
+    if (refined === undefined) {
+      ctx.ui.notify("Clarify cancelled.", "info");
+      return;
+    }
+    if (refined !== draft) runtime.undo.store(draft);
+    draft = refined;
+    ctx.ui.setEditorText(draft);
+  }
+
   if (!runtime.tryStartEnhancement()) {
-    throw new Error("Promptsmith is already enhancing the editor draft.");
+    throw new Error("Prompton is already enhancing the editor draft.");
   }
 
   services.refreshStatus(ctx);
 
-  let attempt: PromptsmithEnhancementAttempt | undefined;
+  let attempt: PromptonEnhancementAttempt | undefined;
   let preparation: EnhancementPreparation | undefined;
   const tracker: EnhancementAttemptTracker = {
     retryUsed: false,
@@ -101,7 +117,7 @@ export async function enhanceEditorDraft(
 
     const outcome = await services.runCancellableTask(
       ctx,
-      `Promptsmith enhancing for ${prepared.resolvedTargetFamily.family} (${prepared.promptContext.effectiveRewriteMode})...`,
+      `Prompton enhancing for ${prepared.resolvedTargetFamily.family} (${prepared.promptContext.effectiveRewriteMode})...`,
       (signal) =>
         generateEnhancedPrompt(
           prepared,
@@ -114,7 +130,7 @@ export async function enhanceEditorDraft(
 
     if (outcome === null) {
       attempt = buildEnhancementAttempt(prepared, tracker, "cancelled");
-      ctx.ui.notify("Promptsmith enhancement cancelled.", "info");
+      ctx.ui.notify("Prompton enhancement cancelled.", "info");
       return;
     }
 
@@ -124,7 +140,7 @@ export async function enhanceEditorDraft(
 
     if (finalText === undefined) {
       attempt = buildEnhancementAttempt(prepared, tracker, "cancelled");
-      ctx.ui.notify("Promptsmith preview cancelled. Editor left unchanged.", "info");
+      ctx.ui.notify("Prompton preview cancelled. Editor left unchanged.", "info");
       return;
     }
 
@@ -136,7 +152,7 @@ export async function enhanceEditorDraft(
       ctx.ui.setEditorText(finalText);
     }
 
-    ctx.ui.notify(buildSuccessMessage(tracker, autoSendResult.sent), "info");
+    ctx.ui.notify(buildSuccessMessage(tracker, autoSendResult.sent, finalText), "info");
     if (autoSendResult.error) {
       ctx.ui.notify(autoSendResult.error, "warning");
     }
@@ -176,7 +192,7 @@ export async function enhanceEditorDraft(
 
 async function prepareEnhancement(
   ctx: ExtensionContext,
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   draft: string,
   services: Pick<EnhancementServices, "exec">
 ): Promise<EnhancementPreparation> {
@@ -196,10 +212,7 @@ async function prepareEnhancement(
     enhancerModel: enhancerModel.model,
     exec: (command, args) => services.exec(command, args, { cwd: ctx.cwd }),
   });
-  const request =
-    resolvedTargetFamily.family === "claude"
-      ? buildClaudeStrategyRequest(promptContext)
-      : buildGptStrategyRequest(promptContext);
+  const request = buildStrategyRequest(promptContext);
 
   return {
     resolvedTargetFamily,
@@ -233,7 +246,7 @@ export async function runEnhancementWithLoader(
             return;
           }
 
-          taskError = error instanceof Error ? error : new Error("Promptsmith enhancement failed.");
+          taskError = error instanceof Error ? error : new Error("Prompton enhancement failed.");
           done(null);
         });
 
@@ -434,8 +447,8 @@ function buildRetryRequest(request: Context): Context {
 function buildEnhancementAttempt(
   preparation: EnhancementPreparation,
   tracker: EnhancementAttemptTracker,
-  outcome: PromptsmithEnhancementAttempt["outcome"]
-): PromptsmithEnhancementAttempt {
+  outcome: PromptonEnhancementAttempt["outcome"]
+): PromptonEnhancementAttempt {
   return {
     outcome,
     enhancerModel: {
@@ -448,17 +461,22 @@ function buildEnhancementAttempt(
   };
 }
 
-function buildSuccessMessage(tracker: EnhancementAttemptTracker, autoSent: boolean): string {
+function buildSuccessMessage(
+  tracker: EnhancementAttemptTracker,
+  autoSent: boolean,
+  finalText?: string
+): string {
   const action = autoSent ? "enhanced and sent the refined prompt" : "enhanced the current draft";
+  const tokenSuffix = finalText ? ` (~${estimateTextTokens(finalText)} tokens)` : "";
 
   return tracker.recoveredAfterRetry
-    ? `Promptsmith ${action} after retrying the model output format once.`
-    : `Promptsmith ${action}.`;
+    ? `Prompton ${action} after retrying the model output format once.${tokenSuffix}`
+    : `Prompton ${action}.${tokenSuffix}`;
 }
 
 function sendEnhancedPromptIfConfigured(
   ctx: ExtensionContext,
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   finalText: string,
   services: Pick<EnhancementServices, "sendUserMessage">
 ): { sent: boolean; error?: string } {
@@ -469,7 +487,7 @@ function sendEnhancedPromptIfConfigured(
   if (!finalText.trim()) {
     return {
       sent: false,
-      error: "Promptsmith left the refined prompt in the editor because the final prompt is empty.",
+      error: "Prompton left the refined prompt in the editor because the final prompt is empty.",
     };
   }
 
@@ -485,33 +503,33 @@ function sendEnhancedPromptIfConfigured(
   } catch (error) {
     return {
       sent: false,
-      error: `Promptsmith refined the draft, but auto-send failed: ${error instanceof Error ? error.message : String(error)}`,
+      error: `Prompton refined the draft, but auto-send failed: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
 
 function buildInvalidModelOutputFailureSummary(
-  primaryError: PromptsmithInvalidModelOutputError,
-  retryError: PromptsmithInvalidModelOutputError
+  primaryError: PromptonInvalidModelOutputError,
+  retryError: PromptonInvalidModelOutputError
 ): string {
   return `primary: ${describeInvalidModelOutputReason(primaryError.reason)}; retry: ${describeInvalidModelOutputReason(retryError.reason)}`;
 }
 
 function buildInvalidModelOutputFailureMessage(
   enhancerModelLabel: string,
-  primaryError: PromptsmithInvalidModelOutputError,
+  primaryError: PromptonInvalidModelOutputError,
   primaryText: string,
-  retryError: PromptsmithInvalidModelOutputError,
+  retryError: PromptonInvalidModelOutputError,
   retryText: string
 ): string {
   return [
-    `Promptsmith enhancer model ${enhancerModelLabel} returned invalid output twice.`,
+    `Prompton enhancer model ${enhancerModelLabel} returned invalid output twice.`,
     `Primary failure: ${describeInvalidModelOutputReason(primaryError.reason)}.`,
     `Retry failure: ${describeInvalidModelOutputReason(retryError.reason)}.`,
     `Expected exactly one sentinel block: ${buildSentinelReminder()}`,
     `Primary response preview: ${formatModelOutputPreview(primaryText)}`,
     `Retry response preview: ${formatModelOutputPreview(retryText)}`,
-    "Try /promptsmith status to inspect the current enhancer configuration or switch to a more format-reliable enhancer model.",
+    "Try /prompton status to inspect the current enhancer configuration or switch to a more format-reliable enhancer model.",
   ].join("\n");
 }
 
@@ -562,12 +580,12 @@ function waitForTimeout(signal: AbortSignal, timeoutMs: number): Promise<never> 
 function createTimeoutError(timeoutMs: number): Error {
   const seconds = Math.floor(timeoutMs / 1_000);
   return new Error(
-    `Promptsmith enhancement timed out after ${seconds} seconds. Try again or choose a faster enhancer model.`
+    `Prompton enhancement timed out after ${seconds} seconds. Try again or choose a faster enhancer model.`
   );
 }
 
 export function buildEnhancerModeLabel(
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   activeModel: Model<Api> | undefined
 ): string {
   switch (settings.enhancerModelMode) {

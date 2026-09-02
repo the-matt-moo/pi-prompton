@@ -1,11 +1,11 @@
 import { normalize } from "./model-routing.js";
-import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "./types.js";
+import type { ModelRef, PromptonFamily, PromptonSettings } from "./types.js";
 
 export function upsertExactModelOverride(
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   modelRef: ModelRef,
-  family: PromptsmithFamily
-): PromptsmithSettings {
+  family: PromptonFamily
+): PromptonSettings {
   return {
     ...settings,
     exactModelOverrides: [
@@ -22,9 +22,9 @@ export function upsertExactModelOverride(
 }
 
 export function removeExactModelOverride(
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   modelRef: ModelRef
-): PromptsmithSettings {
+): PromptonSettings {
   return {
     ...settings,
     exactModelOverrides: settings.exactModelOverrides.filter(
@@ -38,10 +38,10 @@ export function removeExactModelOverride(
 }
 
 export function upsertFamilyOverride(
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   pattern: string,
-  family: PromptsmithFamily
-): PromptsmithSettings {
+  family: PromptonFamily
+): PromptonSettings {
   return {
     ...settings,
     familyOverrides: [
@@ -54,9 +54,9 @@ export function upsertFamilyOverride(
 }
 
 export function removeFamilyOverride(
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   pattern: string
-): PromptsmithSettings {
+): PromptonSettings {
   return {
     ...settings,
     familyOverrides: settings.familyOverrides.filter(

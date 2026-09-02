@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildClaudeStrategyRequest } from "../src/strategies/claude.js";
-import { buildGptStrategyRequest } from "../src/strategies/gpt.js";
+import { buildStrategyRequest } from "../src/strategies/unified.js";
 import { buildPromptContext } from "../src/context.js";
 import {
   analyzeDraftIntent,
@@ -10,7 +9,7 @@ import {
 } from "../src/intent.js";
 import { buildStatusLine, buildStatusReport, refreshStatusLine } from "../src/ui/status.js";
 import { createCommandContext, createModel, createRuntimeState } from "./helpers.js";
-import type { PromptsmithContextPayload } from "../src/types.js";
+import type { PromptonContextPayload } from "../src/types.js";
 
 void test("intent classification detects implement-oriented drafts", () => {
   assert.equal(
@@ -20,7 +19,7 @@ void test("intent classification detects implement-oriented drafts", () => {
 });
 
 void test("intent classification detects debug-oriented drafts", () => {
-  assert.equal(detectTaskIntent("Debug why /promptsmith hangs and fix the timeout bug."), "debug");
+  assert.equal(detectTaskIntent("Debug why /prompton hangs and fix the timeout bug."), "debug");
 });
 
 void test("intent classification detects refactor-oriented drafts", () => {
@@ -63,7 +62,7 @@ void test("intent classification detects test-fix-oriented drafts", () => {
 });
 
 void test("intent classification detects explain-oriented drafts", () => {
-  assert.equal(detectTaskIntent("Explain how Promptsmith model routing works."), "explain");
+  assert.equal(detectTaskIntent("Explain how Prompton model routing works."), "explain");
 });
 
 void test("intent classification keeps explanation-first mixed prompts in explain mode when no action is requested", () => {
@@ -84,13 +83,13 @@ void test("intent classification treats how-to fix prompts as debug work", () =>
 
 void test("intent classification treats how-to implementation prompts as implement work", () => {
   assert.equal(
-    detectTaskIntent("How should I implement rewrite mode support in Promptsmith?"),
+    detectTaskIntent("How should I implement rewrite mode support in Prompton?"),
     "implement"
   );
 });
 
 void test("intent classification treats why-is-it-broken prompts with a fix request as debug work", () => {
-  assert.equal(detectTaskIntent("Why is Promptsmith stuck loading and how do we fix it?"), "debug");
+  assert.equal(detectTaskIntent("Why is Prompton stuck loading and how do we fix it?"), "debug");
 });
 
 void test("intent classification still prefers execution when the draft asks to explain and fix", () => {
@@ -157,55 +156,57 @@ void test("buildPromptContext caps the safe input budget to the enhancer model u
   );
 });
 
-void test("gpt strategy request includes OpenAI prompt guidance", () => {
-  const request = buildGptStrategyRequest(
+void test("unified strategy request includes outcome-first guidance", () => {
+  const request = buildStrategyRequest(
     createPromptContext({ effectiveRewriteMode: "execution-contract", intent: "research" })
   );
   const text = `${request.systemPrompt}\n${extractUserText(request)}`;
 
-  assert.match(text, /OpenAI prompt guidance/i);
-  assert.match(text, /outcome-first/i);
-  assert.match(text, /retrieval budget/i);
+  assert.match(text, /outcome first/i);
+  assert.match(text, /decision rules/i);
   assert.match(text, /stop rules/i);
 });
 
-void test("claude strategy request does not include OpenAI-specific guidance", () => {
-  const request = buildClaudeStrategyRequest(
-    createPromptContext({ effectiveRewriteMode: "execution-contract", intent: "research" })
-  );
-  const text = `${request.systemPrompt}\n${extractUserText(request)}`;
-
-  assert.doesNotMatch(text, /OpenAI prompt guidance/i);
-  assert.doesNotMatch(text, /retrieval budget/i);
-});
-
-void test("gpt strategy request changes instructions between plain and execution-contract modes", () => {
-  const plainRequest = buildGptStrategyRequest(
+void test("unified strategy changes instructions between plain and execution-contract modes", () => {
+  const plainRequest = buildStrategyRequest(
     createPromptContext({ effectiveRewriteMode: "plain", intent: "explain" })
   );
-  const contractRequest = buildGptStrategyRequest(
+  const contractRequest = buildStrategyRequest(
     createPromptContext({ effectiveRewriteMode: "execution-contract", intent: "debug" })
   );
 
   const plainText = extractUserText(plainRequest);
   const contractText = extractUserText(contractRequest);
 
-  assert.match(plainText, /stronger GPT-style prompt/i);
+  assert.match(plainText, /stronger prompt/i);
   assert.doesNotMatch(plainText, /execution contract/i);
-  assert.match(contractText, /concise GPT-style execution contract/i);
+  assert.match(contractText, /concise execution contract/i);
   assert.match(contractText, /root cause/i);
   assert.match(contractText, /<effective_rewrite_mode>\s*execution-contract/i);
 });
 
-void test("claude execution-contract strategy allows stronger explicit structure without bloating", () => {
-  const request = buildClaudeStrategyRequest(
+void test("unified execution-contract strategy includes XML guidance and intent shaping", () => {
+  const request = buildStrategyRequest(
     createPromptContext({ effectiveRewriteMode: "execution-contract", intent: "implement" })
   );
 
-  const text = extractUserText(request);
+  const text = `${request.systemPrompt}\n${extractUserText(request)}`;
   assert.match(text, /XML-like sections/i);
   assert.match(text, /smallest strong contract/i);
   assert.match(text, /clear feature goal/i);
+});
+
+void test("unified strategy propagates target family in context sections", () => {
+  const request = buildStrategyRequest(
+    createPromptContext({
+      effectiveRewriteMode: "plain",
+      intent: "general",
+      targetFamily: "claude",
+    })
+  );
+
+  const text = extractUserText(request);
+  assert.match(text, /<resolved_target_family>\s*claude/i);
 });
 
 void test("extractUserText finds the user message when system messages are prepended", () => {
@@ -267,7 +268,7 @@ void test("status line stays hidden by default", () => {
 
   refreshStatusLine(ctx, runtime);
 
-  assert.equal(ctx.uiState.status.get("promptsmith"), undefined);
+  assert.equal(ctx.uiState.status.get("prompton"), undefined);
 });
 
 void test("status line reflects the current draft analysis when enabled", () => {
@@ -280,7 +281,7 @@ void test("status line reflects the current draft analysis when enabled", () => 
 
   refreshStatusLine(ctx, runtime);
 
-  const line = ctx.uiState.status.get("promptsmith");
+  const line = ctx.uiState.status.get("prompton");
   assert.ok(line);
   assert.match(line, /mode: auto → execution-contract\/review/);
 });
@@ -302,7 +303,7 @@ void test("status line surfaces the last failed enhancement", () => {
 
   refreshStatusLine(ctx, runtime);
 
-  const line = ctx.uiState.status.get("promptsmith");
+  const line = ctx.uiState.status.get("prompton");
   assert.ok(line);
   assert.match(line, /last: failed/);
 });
@@ -316,11 +317,11 @@ void test("status line clears when the footer status setting is turned off", () 
   });
 
   refreshStatusLine(ctx, runtime);
-  assert.ok(ctx.uiState.status.get("promptsmith"));
+  assert.ok(ctx.uiState.status.get("prompton"));
 
   runtime.replaceSettings({ ...runtime.getSettings(), statusBarEnabled: false });
   refreshStatusLine(ctx, runtime);
-  assert.equal(ctx.uiState.status.get("promptsmith"), undefined);
+  assert.equal(ctx.uiState.status.get("prompton"), undefined);
 });
 
 void test("status line falls back to configured rewrite mode when the editor is empty", () => {
@@ -382,9 +383,7 @@ void test("status report includes the last enhancement attempt details", () => {
   );
 });
 
-function createPromptContext(
-  overrides: Partial<PromptsmithContextPayload>
-): PromptsmithContextPayload {
+function createPromptContext(overrides: Partial<PromptonContextPayload>): PromptonContextPayload {
   return {
     draft: "draft",
     activeModel: { provider: "openai", id: "gpt-5" },

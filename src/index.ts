@@ -2,24 +2,23 @@ import { complete } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { CompleteFn } from "./enhance.js";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";
-import { getPromptsmithArgumentCompletions, handlePromptsmithCommand } from "./commands.js";
+import { getPromptonArgumentCompletions, handlePromptonCommand } from "./commands.js";
 import { runEnhancementWithLoader } from "./enhance.js";
 import { formatShortcutKey, getCustomShortcutKey } from "./shortcut-key.js";
-import { PromptsmithRuntimeState } from "./state.js";
-import { handlePromptsmithShortcut } from "./shortcut.js";
-import { attachPromptsmithShortcut, createBasePromptsmithEditor } from "./ui/promptsmith-editor.js";
-import { openSettingsUi } from "./ui/settings.js";
+import { PromptonRuntimeState } from "./state.js";
+import { handlePromptonShortcut } from "./shortcut.js";
+import { attachPromptonShortcut, createBasePromptonEditor } from "./ui/prompton-editor.js";
 import { refreshStatusLine } from "./ui/status.js";
 
-export default function promptsmithExtension(pi: ExtensionAPI): void {
-  createPromptsmithExtension(pi);
+export default function promptonExtension(pi: ExtensionAPI): void {
+  createPromptonExtension(pi);
 }
 
-export function createPromptsmithExtension(
+export function createPromptonExtension(
   pi: ExtensionAPI,
-  options?: { completeFn?: CompleteFn; runtime?: PromptsmithRuntimeState }
+  options?: { completeFn?: CompleteFn; runtime?: PromptonRuntimeState }
 ): void {
-  const runtime = options?.runtime ?? new PromptsmithRuntimeState();
+  const runtime = options?.runtime ?? new PromptonRuntimeState();
   let ownsEditorComponent = false;
   let previousEditorFactory: ReturnType<ExtensionContext["ui"]["getEditorComponent"]>;
   let installedCustomShortcutKey: string | undefined;
@@ -68,20 +67,19 @@ export function createPromptsmithExtension(
 
       const baseEditor =
         baseEditorFactory?.(tui, theme, keybindings) ??
-        createBasePromptsmithEditor(tui, theme, keybindings);
+        createBasePromptonEditor(tui, theme, keybindings);
 
-      return attachPromptsmithShortcut(
+      return attachPromptonShortcut(
         baseEditor,
         keybindings,
         () => runtime.getSettings(),
         () => {
-          void handlePromptsmithShortcut(ctx, runtime, {
+          void handlePromptonShortcut(ctx, runtime, {
             completeFn: options?.completeFn ?? complete,
             exec: pi.exec.bind(pi),
             sendUserMessage: pi.sendUserMessage.bind(pi),
             refreshStatus,
             runCancellableTask: runEnhancementWithLoader,
-            openSettings,
           });
         }
       );
@@ -93,10 +91,6 @@ export function createPromptsmithExtension(
     refreshStatusLine(ctx, runtime);
   };
 
-  const openSettings = async (ctx: ExtensionContext): Promise<void> => {
-    await openSettingsUi(ctx, runtime, { refreshStatus });
-  };
-
   const triggerDefaultShortcut = async (ctx: ExtensionContext): Promise<void> => {
     const settings = runtime.getSettings();
     const shortcutServices = {
@@ -105,28 +99,27 @@ export function createPromptsmithExtension(
       sendUserMessage: pi.sendUserMessage.bind(pi),
       refreshStatus,
       runCancellableTask: runEnhancementWithLoader,
-      openSettings,
     };
 
     if (!settings.enabled) {
-      await handlePromptsmithShortcut(ctx, runtime, shortcutServices);
+      await handlePromptonShortcut(ctx, runtime, shortcutServices);
       return;
     }
 
     if (!settings.shortcutEnabled) {
-      ctx.ui.notify("Promptsmith shortcut is disabled globally.", "info");
+      ctx.ui.notify("Prompton shortcut is disabled globally.", "info");
       return;
     }
 
     if (activeCustomShortcutKey && activeCustomShortcutKey !== DEFAULT_SHORTCUT_KEY) {
       ctx.ui.notify(
-        `Promptsmith shortcut is now ${formatShortcutKey(activeCustomShortcutKey)}.`,
+        `Prompton shortcut is now ${formatShortcutKey(activeCustomShortcutKey)}.`,
         "info"
       );
       return;
     }
 
-    await handlePromptsmithShortcut(ctx, runtime, shortcutServices);
+    await handlePromptonShortcut(ctx, runtime, shortcutServices);
   };
 
   const restorePersistedSettings = (ctx: ExtensionContext): void => {
@@ -149,9 +142,9 @@ export function createPromptsmithExtension(
 
   pi.registerCommand(EXTENSION_COMMAND, {
     description: "Enhance the current editor prompt in-place",
-    getArgumentCompletions: getPromptsmithArgumentCompletions,
+    getArgumentCompletions: getPromptonArgumentCompletions,
     handler: async (args, ctx) => {
-      await handlePromptsmithCommand(args, ctx, runtime, {
+      await handlePromptonCommand(args, ctx, runtime, {
         completeFn: options?.completeFn ?? complete,
         exec: pi.exec.bind(pi),
         sendUserMessage: pi.sendUserMessage.bind(pi),

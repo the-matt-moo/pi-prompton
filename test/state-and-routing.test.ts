@@ -12,7 +12,7 @@ import {
   upsertExactModelOverride,
   upsertFamilyOverride,
 } from "../src/overrides.js";
-import { PromptsmithRuntimeState, sanitizeSettings } from "../src/state.js";
+import { PromptonRuntimeState, sanitizeSettings } from "../src/state.js";
 import { detectRuntimeSupport } from "../src/validation.js";
 import { createCommandContext, createModel, createRuntimeState } from "./helpers.js";
 
@@ -196,9 +196,9 @@ void test("setFamilyEnhancerModel clears orphaned partial family selections", ()
 });
 
 void test("settings persist across sessions globally", () => {
-  const storageDir = mkdtempSync(join(tmpdir(), "promptsmith-state-"));
-  const settingsPath = join(storageDir, "promptsmith-settings.json");
-  const runtime = new PromptsmithRuntimeState(settingsPath);
+  const storageDir = mkdtempSync(join(tmpdir(), "prompton-state-"));
+  const settingsPath = join(storageDir, "prompton-settings.json");
+  const runtime = new PromptonRuntimeState(settingsPath);
 
   runtime.persistSettings({
     ...runtime.getSettings(),
@@ -211,7 +211,7 @@ void test("settings persist across sessions globally", () => {
     enhancementTimeoutMs: 12_000,
   });
 
-  const restoredRuntime = new PromptsmithRuntimeState(settingsPath);
+  const restoredRuntime = new PromptonRuntimeState(settingsPath);
   restoredRuntime.restoreSettings();
 
   assert.equal(restoredRuntime.getSettings().enabled, false);
@@ -224,10 +224,10 @@ void test("settings persist across sessions globally", () => {
 });
 
 void test("failed global settings writes do not claim success or corrupt runtime state", () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "promptsmith-state-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "prompton-state-"));
   const filePath = join(tempDir, "not-a-directory");
   writeFileSync(filePath, "x", "utf8");
-  const runtime = new PromptsmithRuntimeState(join(filePath, "promptsmith-settings.json"));
+  const runtime = new PromptonRuntimeState(join(filePath, "prompton-settings.json"));
   const previousSettings = runtime.getSettings();
 
   assert.throws(() => {
@@ -243,6 +243,20 @@ void test("failed global settings writes do not claim success or corrupt runtime
 
 void test("sanitizeSettings rejects unknown schema versions", () => {
   assert.equal(sanitizeSettings({ version: 2 }), undefined);
+});
+
+void test("sanitizeSettings restores clarify settings and defaults missing values", () => {
+  assert.equal(
+    sanitizeSettings({ version: 1, clarifyEnabled: true, clarifyOnShortcut: true })?.clarifyEnabled,
+    true
+  );
+  assert.equal(
+    sanitizeSettings({ version: 1, clarifyEnabled: true, clarifyOnShortcut: true })
+      ?.clarifyOnShortcut,
+    true
+  );
+  assert.equal(sanitizeSettings({ version: 1 })?.clarifyEnabled, false);
+  assert.equal(sanitizeSettings({ version: 1 })?.clarifyOnShortcut, false);
 });
 
 void test("sanitizeSettings normalizes shortcut keys and falls back on unsafe values", () => {

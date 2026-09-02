@@ -1,6 +1,6 @@
 import type { SelectDialogItem } from "./select-dialog.js";
 import { formatShortcutKey } from "../shortcut-key.js";
-import type { ModelRef, PromptsmithAutoSendBusyBehavior, PromptsmithSettings } from "../types.js";
+import type { ModelRef, PromptonAutoSendBusyBehavior, PromptonSettings } from "../types.js";
 
 export type SettingsMenuOptionId =
   | "enabled"
@@ -23,6 +23,8 @@ export type SettingsMenuOptionId =
   | "preserveCodeBlocks"
   | "exactModelOverrides"
   | "familyOverrides"
+  | "clarifyEnabled"
+  | "clarifyOnShortcut"
   | "reset"
   | "done";
 
@@ -61,26 +63,26 @@ export const FAMILY_OPTIONS = [
 ] as const;
 
 export function buildSettingsMenuOptions(
-  settings: PromptsmithSettings
+  settings: PromptonSettings
 ): Partial<Record<SettingsMenuOptionId, SelectDialogItem>> {
   return {
     enabled: createSettingsMenuItem(
       "enabled",
       "Prompt enhancement",
       onOff(settings.enabled),
-      "Master switch for /promptsmith and the keyboard shortcut."
+      "Master switch for /prompton and the keyboard shortcut."
     ),
     shortcutEnabled: createSettingsMenuItem(
       "shortcutEnabled",
       "Keyboard shortcut",
       `${onOff(settings.shortcutEnabled)} · ${formatShortcutKey(settings.shortcutKey)}`,
-      "Run Promptsmith directly from the editor. Change the key combo or turn it off."
+      "Run Prompton directly from the editor. Change the key combo or turn it off."
     ),
     statusBarEnabled: createSettingsMenuItem(
       "statusBarEnabled",
       "Footer status bar",
       onOff(settings.statusBarEnabled),
-      "Show compact live Promptsmith status in the footer."
+      "Show compact live Prompton status in the footer."
     ),
     targetFamilyMode: createSettingsMenuItem(
       "targetFamilyMode",
@@ -140,7 +142,7 @@ export function buildSettingsMenuOptions(
       "rewriteStrength",
       "Rewrite strength",
       capitalize(settings.rewriteStrength),
-      "How aggressively Promptsmith rewrites the draft."
+      "How aggressively Prompton rewrites the draft."
     ),
     rewriteMode: createSettingsMenuItem(
       "rewriteMode",
@@ -188,21 +190,33 @@ export function buildSettingsMenuOptions(
       String(settings.familyOverrides.length),
       "Route model patterns like openai/* or kimi-*."
     ),
+    clarifyEnabled: createSettingsMenuItem(
+      "clarifyEnabled",
+      "Clarify before enhancing",
+      onOff(settings.clarifyEnabled),
+      "Show a single clarification dialog (lint + intent suggestions) before enhancing."
+    ),
+    clarifyOnShortcut: createSettingsMenuItem(
+      "clarifyOnShortcut",
+      "Clarify on shortcut",
+      onOff(settings.clarifyOnShortcut),
+      "Also show clarification dialog when triggered via the keyboard shortcut."
+    ),
     reset: {
       value: "reset",
       label: "Reset saved settings",
-      description: "Restore Promptsmith settings to defaults.",
+      description: "Restore Prompton settings to defaults.",
     },
     done: {
       value: "done",
       label: "Done",
-      description: "Close Promptsmith settings.",
+      description: "Close Prompton settings.",
     },
   };
 }
 
 export function describeSelectedTargetFamilyMode(
-  value: PromptsmithSettings["targetFamilyMode"]
+  value: PromptonSettings["targetFamilyMode"]
 ): string | undefined {
   switch (value) {
     case "auto":
@@ -215,7 +229,7 @@ export function describeSelectedTargetFamilyMode(
 }
 
 export function describeSelectedEnhancerMode(
-  value: PromptsmithSettings["enhancerModelMode"]
+  value: PromptonSettings["enhancerModelMode"]
 ): string | undefined {
   switch (value) {
     case "active":
@@ -228,7 +242,7 @@ export function describeSelectedEnhancerMode(
 }
 
 export function describeSelectedStrength(
-  value: PromptsmithSettings["rewriteStrength"]
+  value: PromptonSettings["rewriteStrength"]
 ): string | undefined {
   switch (value) {
     case "light":
@@ -241,7 +255,7 @@ export function describeSelectedStrength(
 }
 
 export function describeSelectedRewriteMode(
-  value: PromptsmithSettings["rewriteMode"]
+  value: PromptonSettings["rewriteMode"]
 ): string | undefined {
   switch (value) {
     case "auto":
@@ -254,7 +268,7 @@ export function describeSelectedRewriteMode(
 }
 
 export function describeSelectedAutoSendBusyBehavior(
-  value: PromptsmithAutoSendBusyBehavior
+  value: PromptonAutoSendBusyBehavior
 ): string | undefined {
   switch (value) {
     case "steer":
@@ -266,7 +280,7 @@ export function describeSelectedAutoSendBusyBehavior(
 
 export function parseLabeledTargetFamilyMode(
   value: string | undefined
-): PromptsmithSettings["targetFamilyMode"] | undefined {
+): PromptonSettings["targetFamilyMode"] | undefined {
   if (value?.startsWith("auto")) return "auto";
   if (value?.startsWith("gpt")) return "gpt";
   if (value?.startsWith("claude")) return "claude";
@@ -275,7 +289,7 @@ export function parseLabeledTargetFamilyMode(
 
 export function parseLabeledEnhancerMode(
   value: string | undefined
-): PromptsmithSettings["enhancerModelMode"] | undefined {
+): PromptonSettings["enhancerModelMode"] | undefined {
   if (value?.startsWith("active")) return "active";
   if (value?.startsWith("fixed")) return "fixed";
   if (value?.startsWith("family-linked")) return "family-linked";
@@ -284,7 +298,7 @@ export function parseLabeledEnhancerMode(
 
 export function parseLabeledStrength(
   value: string | undefined
-): PromptsmithSettings["rewriteStrength"] | undefined {
+): PromptonSettings["rewriteStrength"] | undefined {
   if (value?.startsWith("light")) return "light";
   if (value?.startsWith("balanced")) return "balanced";
   if (value?.startsWith("strong")) return "strong";
@@ -293,7 +307,7 @@ export function parseLabeledStrength(
 
 export function parseLabeledRewriteMode(
   value: string | undefined
-): PromptsmithSettings["rewriteMode"] | undefined {
+): PromptonSettings["rewriteMode"] | undefined {
   if (value?.startsWith("auto")) return "auto";
   if (value?.startsWith("plain")) return "plain";
   if (value?.startsWith("execution-contract")) return "execution-contract";
@@ -302,7 +316,7 @@ export function parseLabeledRewriteMode(
 
 export function parseLabeledAutoSendBusyBehavior(
   value: string | undefined
-): PromptsmithAutoSendBusyBehavior | undefined {
+): PromptonAutoSendBusyBehavior | undefined {
   if (value?.startsWith("steer")) return "steer";
   if (value?.startsWith("follow-up")) return "followUp";
   return undefined;
@@ -337,7 +351,7 @@ export function formatTimeoutSeconds(timeoutMs: number): string {
   return `${Math.floor(timeoutMs / 1_000)}s`;
 }
 
-function describeTargetFamilyMode(settings: PromptsmithSettings): string {
+function describeTargetFamilyMode(settings: PromptonSettings): string {
   switch (settings.targetFamilyMode) {
     case "auto":
       return "Auto (match current model)";
@@ -348,7 +362,7 @@ function describeTargetFamilyMode(settings: PromptsmithSettings): string {
   }
 }
 
-function describeEnhancerMode(settings: PromptsmithSettings): string {
+function describeEnhancerMode(settings: PromptonSettings): string {
   switch (settings.enhancerModelMode) {
     case "active":
       return "Active model";
@@ -359,7 +373,7 @@ function describeEnhancerMode(settings: PromptsmithSettings): string {
   }
 }
 
-function describeRewriteMode(settings: PromptsmithSettings): string {
+function describeRewriteMode(settings: PromptonSettings): string {
   switch (settings.rewriteMode) {
     case "auto":
       return "Auto (infer task vs plain rewrite)";
@@ -370,6 +384,6 @@ function describeRewriteMode(settings: PromptsmithSettings): string {
   }
 }
 
-function describeAutoSendBusyBehavior(value: PromptsmithAutoSendBusyBehavior): string {
+function describeAutoSendBusyBehavior(value: PromptonAutoSendBusyBehavior): string {
   return value === "followUp" ? "Follow-up" : "Steer";
 }

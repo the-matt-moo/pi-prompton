@@ -1,6 +1,6 @@
 import { matchesKey, type KeyId } from "@earendil-works/pi-tui";
 import { DEFAULT_SHORTCUT_KEY } from "./constants.js";
-import type { PromptsmithSettings } from "./types.js";
+import type { PromptonSettings } from "./types.js";
 
 const MODIFIER_ORDER = ["ctrl", "shift", "alt"] as const;
 const MODIFIERS = new Set<string>(MODIFIER_ORDER);
@@ -147,7 +147,7 @@ export function validateShortcutKey(
 
   if (!hasShortcutModifier(normalized.split("+"))) {
     return {
-      error: "Promptsmith shortcuts must include Alt and/or Ctrl so normal typing keeps working.",
+      error: "Prompton shortcuts must include Alt and/or Ctrl so normal typing keeps working.",
     };
   }
 
@@ -194,12 +194,12 @@ export function formatShortcutKey(value: string | undefined): string {
   return fallbackParts ? formatShortcutParts(fallbackParts) : DEFAULT_SHORTCUT_KEY;
 }
 
-export function isDefaultShortcutConfigured(settings: PromptsmithSettings): boolean {
+export function isDefaultShortcutConfigured(settings: PromptonSettings): boolean {
   return normalizeShortcutKey(settings.shortcutKey) === DEFAULT_SHORTCUT_KEY;
 }
 
 export function getCustomShortcutKey(
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   effectiveKeybindings?: EffectiveKeybindings
 ): KeyId | undefined {
   if (!settings.enabled || !settings.shortcutEnabled) {
@@ -224,7 +224,7 @@ export function getCustomShortcutKey(
 
 export function matchesCustomShortcut(
   data: string,
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   effectiveKeybindings: EffectiveKeybindings
 ): boolean {
   const shortcutKey = getCustomShortcutKey(settings, effectiveKeybindings);

@@ -10,8 +10,8 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { matchesKey } from "@earendil-works/pi-tui";
 import { DEFAULT_SETTINGS, SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
-import { PromptsmithRuntimeState } from "../src/state.js";
-import type { PromptsmithSettings } from "../src/types.js";
+import { PromptonRuntimeState } from "../src/state.js";
+import type { PromptonSettings } from "../src/types.js";
 
 export interface MockPiHarness {
   pi: ExtensionAPI;
@@ -181,15 +181,15 @@ export function createMockPi(): MockPiHarness {
   return { pi, commands, shortcuts, events, userMessages };
 }
 
-export function createRuntimeState(): PromptsmithRuntimeState {
-  return new PromptsmithRuntimeState(
-    join(mkdtempSync(join(tmpdir(), "promptsmith-test-state-")), "promptsmith-settings.json")
+export function createRuntimeState(): PromptonRuntimeState {
+  return new PromptonRuntimeState(
+    join(mkdtempSync(join(tmpdir(), "prompton-test-state-")), "prompton-settings.json")
   );
 }
 
 export function createPersistedRuntimeState(
-  overrides: Partial<PromptsmithSettings>
-): PromptsmithRuntimeState {
+  overrides: Partial<PromptonSettings>
+): PromptonRuntimeState {
   const runtime = createRuntimeState();
   runtime.persistSettings({ ...DEFAULT_SETTINGS, ...overrides });
   return runtime;
@@ -217,6 +217,7 @@ export function createCommandContext(options?: {
   editorResponse?: string;
   nextSelectValue?: string;
   nextInputValue?: string;
+  nextConfirmValue?: boolean;
   customInputSequence?: string[];
   themeCount?: number;
   keybindingsConfig?: MockKeybindingsConfig;
@@ -412,7 +413,7 @@ export function createCommandContext(options?: {
           resolveResult = resolve;
         });
       },
-      confirm: () => Promise.resolve(false),
+      confirm: () => Promise.resolve(options?.nextConfirmValue ?? false),
       onTerminalInput: () => () => undefined,
       setWorkingMessage: () => undefined,
       setWidget: () => undefined,

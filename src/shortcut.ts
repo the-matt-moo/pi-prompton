@@ -1,37 +1,44 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { EnhancementServices } from "./enhance.js";
 import { enhanceEditorDraft } from "./enhance.js";
+import { pickTemplate } from "./templates.js";
 import { detectRuntimeSupport } from "./validation.js";
-import type { PromptsmithRuntimeState } from "./state.js";
+import type { PromptonRuntimeState } from "./state.js";
 
-interface ShortcutServices extends EnhancementServices {
-  openSettings: (ctx: ExtensionContext) => Promise<void>;
-}
+type ShortcutServices = EnhancementServices;
 
-export async function handlePromptsmithShortcut(
+export async function handlePromptonShortcut(
   ctx: ExtensionContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: ShortcutServices
 ): Promise<void> {
   const settings = runtime.getSettings();
   if (!settings.enabled) {
-    ctx.ui.notify("Promptsmith is disabled globally.", "info");
+    ctx.ui.notify("Prompton is disabled globally.", "info");
     return;
   }
   if (!settings.shortcutEnabled) {
-    ctx.ui.notify("Promptsmith shortcut is disabled globally.", "info");
+    ctx.ui.notify("Prompton shortcut is disabled globally.", "info");
     return;
   }
 
   try {
     const support = detectRuntimeSupport(ctx);
     if (support.interactiveTui && !ctx.ui.getEditorText().trim()) {
-      ctx.ui.notify("Editor is empty — opening Promptsmith settings.", "info");
-      await services.openSettings(ctx);
+      const skeleton = await pickTemplate(ctx);
+      if (skeleton) {
+        ctx.ui.setEditorText(skeleton);
+        ctx.ui.notify(
+          "Template loaded. Fill in the [brackets] and press the shortcut again.",
+          "info"
+        );
+      }
       return;
     }
 
-    await enhanceEditorDraft(ctx, runtime, services);
+    await enhanceEditorDraft(ctx, runtime, services, {
+      clarify: runtime.getSettings().clarifyOnShortcut,
+    });
   } catch (error) {
     ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
   }

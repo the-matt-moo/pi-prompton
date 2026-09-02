@@ -1,21 +1,34 @@
+const MAX_HISTORY = 10;
+
+export interface HistoryEntry {
+  draft: string;
+  timestamp: number;
+}
+
 export class UndoManager {
-  private previousDraft: string | undefined;
+  private readonly history: HistoryEntry[] = [];
 
   store(draft: string): void {
-    this.previousDraft = draft;
+    this.history.push({ draft, timestamp: Date.now() });
+    if (this.history.length > MAX_HISTORY) {
+      this.history.shift();
+    }
   }
 
   hasUndo(): boolean {
-    return this.previousDraft !== undefined;
+    return this.history.length > 0;
   }
 
   consume(): string | undefined {
-    const draft = this.previousDraft;
-    this.previousDraft = undefined;
-    return draft;
+    const entry = this.history.pop();
+    return entry?.draft;
+  }
+
+  getHistory(): HistoryEntry[] {
+    return [...this.history];
   }
 
   clear(): void {
-    this.previousDraft = undefined;
+    this.history.length = 0;
   }
 }

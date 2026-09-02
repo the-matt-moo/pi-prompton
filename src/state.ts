@@ -14,53 +14,57 @@ import type {
   FamilyEnhancerModels,
   FamilyOverride,
   ModelRef,
-  PromptsmithDraftResolution,
-  PromptsmithEnhancementAttempt,
-  PromptsmithSettings,
+  PromptonDraftResolution,
+  PromptonEnhancementAttempt,
+  PromptonSettings,
 } from "./types.js";
 import { UndoManager } from "./undo.js";
 
-export class PromptsmithRuntimeState {
-  private settings: PromptsmithSettings = cloneSettings(DEFAULT_SETTINGS);
+export class PromptonRuntimeState {
+  private settings: PromptonSettings = cloneSettings(DEFAULT_SETTINGS);
   private busy = false;
-  private lastDraftResolution: PromptsmithDraftResolution | undefined;
-  private lastEnhancementAttempt: PromptsmithEnhancementAttempt | undefined;
+  private lastDraftResolution: PromptonDraftResolution | undefined;
+  private lastEnhancementAttempt: PromptonEnhancementAttempt | undefined;
   readonly undo = new UndoManager();
 
   constructor(private readonly settingsPath = getGlobalSettingsPath()) {}
 
-  getSettings(): PromptsmithSettings {
+  getSettings(): PromptonSettings {
     return cloneSettings(this.settings);
   }
 
-  replaceSettings(settings: PromptsmithSettings): void {
+  replaceSettings(settings: PromptonSettings): void {
     this.settings = cloneSettings(settings);
     this.lastDraftResolution = undefined;
   }
 
-  persistSettings(settings: PromptsmithSettings): void {
+  persistSettings(settings: PromptonSettings): void {
     const nextSettings = cloneSettings(settings);
     writeSettingsToDisk(this.settingsPath, nextSettings);
     this.replaceSettings(nextSettings);
   }
 
   restoreSettings(): void {
-    const restoredSettings = restoreSettingsFromDisk(this.settingsPath);
+    const restoredSettings =
+      restoreSettingsFromDisk(this.settingsPath) ??
+      (this.settingsPath === getGlobalSettingsPath()
+        ? restoreSettingsFromDisk(getLegacySettingsPath())
+        : undefined);
     this.replaceSettings(restoredSettings ?? cloneSettings(DEFAULT_SETTINGS));
     this.busy = false;
     this.lastEnhancementAttempt = undefined;
     this.undo.clear();
   }
 
-  getLastDraftResolution(): PromptsmithDraftResolution | undefined {
+  getLastDraftResolution(): PromptonDraftResolution | undefined {
     return this.lastDraftResolution ? { ...this.lastDraftResolution } : undefined;
   }
 
-  rememberDraftResolution(resolution: PromptsmithDraftResolution): void {
+  rememberDraftResolution(resolution: PromptonDraftResolution): void {
     this.lastDraftResolution = { ...resolution };
   }
 
-  getLastEnhancementAttempt(): PromptsmithEnhancementAttempt | undefined {
+  getLastEnhancementAttempt(): PromptonEnhancementAttempt | undefined {
     return this.lastEnhancementAttempt
       ? {
           ...this.lastEnhancementAttempt,
@@ -71,7 +75,7 @@ export class PromptsmithRuntimeState {
       : undefined;
   }
 
-  rememberEnhancementAttempt(attempt: PromptsmithEnhancementAttempt): void {
+  rememberEnhancementAttempt(attempt: PromptonEnhancementAttempt): void {
     this.lastEnhancementAttempt = {
       ...attempt,
       ...(attempt.enhancerModel ? { enhancerModel: { ...attempt.enhancerModel } } : {}),
@@ -94,10 +98,14 @@ export class PromptsmithRuntimeState {
 }
 
 function getGlobalSettingsPath(): string {
+  return join(homedir(), ".pi", "agent", "prompton-settings.json");
+}
+
+function getLegacySettingsPath(): string {
   return join(homedir(), ".pi", "agent", "promptsmith-settings.json");
 }
 
-function restoreSettingsFromDisk(path: string): PromptsmithSettings | undefined {
+function restoreSettingsFromDisk(path: string): PromptonSettings | undefined {
   try {
     const raw = readFileSync(path, "utf8");
     return sanitizeSettings(JSON.parse(raw));
@@ -106,7 +114,7 @@ function restoreSettingsFromDisk(path: string): PromptsmithSettings | undefined 
   }
 }
 
-export function sanitizeSettings(value: unknown): PromptsmithSettings | undefined {
+export function sanitizeSettings(value: unknown): PromptonSettings | undefined {
   if (!isRecord(value)) return undefined;
   if (value.version !== DEFAULT_SETTINGS.version) return undefined;
 
@@ -147,10 +155,12 @@ export function sanitizeSettings(value: unknown): PromptsmithSettings | undefine
     autoSendBusyBehavior: readAutoSendBusyBehavior(value.autoSendBusyBehavior),
     preserveCodeBlocks: readBoolean(value.preserveCodeBlocks, DEFAULT_SETTINGS.preserveCodeBlocks),
     enhancementTimeoutMs: readEnhancementTimeoutMs(value.enhancementTimeoutMs),
+    clarifyEnabled: readBoolean(value.clarifyEnabled, DEFAULT_SETTINGS.clarifyEnabled),
+    clarifyOnShortcut: readBoolean(value.clarifyOnShortcut, DEFAULT_SETTINGS.clarifyOnShortcut),
   };
 }
 
-export function cloneSettings(settings: PromptsmithSettings): PromptsmithSettings {
+export function cloneSettings(settings: PromptonSettings): PromptonSettings {
   return {
     ...settings,
     exactModelOverrides: settings.exactModelOverrides.map((entry) => ({ ...entry })),
@@ -173,7 +183,7 @@ export function cloneSettings(settings: PromptsmithSettings): PromptsmithSetting
   };
 }
 
-function writeSettingsToDisk(path: string, settings: PromptsmithSettings): void {
+function writeSettingsToDisk(path: string, settings: PromptonSettings): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
@@ -272,31 +282,31 @@ function readShortcutKey(value: unknown): string {
   return validateShortcutKey(value).normalized ?? DEFAULT_SETTINGS.shortcutKey;
 }
 
-function readTargetFamilyMode(value: unknown): PromptsmithSettings["targetFamilyMode"] {
+function readTargetFamilyMode(value: unknown): PromptonSettings["targetFamilyMode"] {
   return value === "auto" || value === "gpt" || value === "claude"
     ? value
     : DEFAULT_SETTINGS.targetFamilyMode;
 }
 
-function readEnhancerModelMode(value: unknown): PromptsmithSettings["enhancerModelMode"] {
+function readEnhancerModelMode(value: unknown): PromptonSettings["enhancerModelMode"] {
   return value === "active" || value === "fixed" || value === "family-linked"
     ? value
     : DEFAULT_SETTINGS.enhancerModelMode;
 }
 
-function readRewriteStrength(value: unknown): PromptsmithSettings["rewriteStrength"] {
+function readRewriteStrength(value: unknown): PromptonSettings["rewriteStrength"] {
   return value === "light" || value === "balanced" || value === "strong"
     ? value
     : DEFAULT_SETTINGS.rewriteStrength;
 }
 
-function readRewriteMode(value: unknown): PromptsmithSettings["rewriteMode"] {
+function readRewriteMode(value: unknown): PromptonSettings["rewriteMode"] {
   return value === "auto" || value === "plain" || value === "execution-contract"
     ? value
     : DEFAULT_SETTINGS.rewriteMode;
 }
 
-function readAutoSendBusyBehavior(value: unknown): PromptsmithSettings["autoSendBusyBehavior"] {
+function readAutoSendBusyBehavior(value: unknown): PromptonSettings["autoSendBusyBehavior"] {
   return value === "steer" || value === "followUp" ? value : DEFAULT_SETTINGS.autoSendBusyBehavior;
 }
 

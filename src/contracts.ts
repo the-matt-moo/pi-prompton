@@ -1,27 +1,15 @@
-import type {
-  PromptsmithContextPayload,
-  PromptsmithFamily,
-  PromptsmithTaskIntent,
-} from "./types.js";
+import type { PromptonContextPayload, PromptonTaskIntent } from "./types.js";
 
-export function buildStrategyInstructions(
-  family: PromptsmithFamily,
-  context: PromptsmithContextPayload
-): string[] {
+export function buildStrategyInstructions(context: PromptonContextPayload): string[] {
   return context.effectiveRewriteMode === "execution-contract"
-    ? buildExecutionContractInstructions(family, context.intent)
-    : buildPlainRewriteInstructions(family, context.intent);
+    ? buildExecutionContractInstructions(context.intent)
+    : buildPlainRewriteInstructions(context.intent);
 }
 
-function buildPlainRewriteInstructions(
-  family: PromptsmithFamily,
-  intent: PromptsmithTaskIntent
-): string[] {
+function buildPlainRewriteInstructions(intent: PromptonTaskIntent): string[] {
   return [
-    `Rewrite the draft into a stronger ${describeFamily(family)} prompt.`,
-    family === "claude"
-      ? "Use explicit structure when it materially improves clarity, but do not force XML or rigid sections."
-      : "Use direct, practical wording with compact sections only when they materially improve clarity.",
+    "Rewrite the draft into a stronger prompt.",
+    "Use direct, practical wording. Add structure only when it materially improves clarity.",
     intent === "explain"
       ? "Keep it primarily explanatory instead of turning it into an execution plan."
       : "Improve clarity, scope, and output expectations without turning it into a rigid execution contract unless the draft already asks for that.",
@@ -30,23 +18,18 @@ function buildPlainRewriteInstructions(
   ];
 }
 
-function buildExecutionContractInstructions(
-  family: PromptsmithFamily,
-  intent: PromptsmithTaskIntent
-): string[] {
+function buildExecutionContractInstructions(intent: PromptonTaskIntent): string[] {
   return [
-    `Compile the draft into a concise ${describeFamily(family)} execution contract for a Pi coding-agent workflow.`,
+    "Compile the draft into a concise execution contract for a Pi coding-agent workflow.",
     "Produce the smallest strong contract that makes the task executable.",
     "Make the objective, relevant context, explicit constraints, inspection surfaces, expected changes, verification, and deliverable expectations clear when they are useful.",
-    family === "claude"
-      ? "Prefer strong explicit structure. XML-like sections such as <task>, <context>, <constraints>, <verification>, and <deliverable> are allowed when they materially improve clarity."
-      : "Prefer compact natural sections or bullets. Avoid XML unless the draft already uses it or it clearly improves execution clarity.",
+    "Prefer compact Markdown sections or bullets. Use XML-like sections only when the draft already uses them or they materially improve reliable execution or parsing.",
     "Do not emit empty sections, generic filler, or speculative requirements.",
     ...buildIntentGuidance(intent),
   ];
 }
 
-function buildIntentGuidance(intent: PromptsmithTaskIntent): string[] {
+function buildIntentGuidance(intent: PromptonTaskIntent): string[] {
   switch (intent) {
     case "implement":
       return [
@@ -83,8 +66,4 @@ function buildIntentGuidance(intent: PromptsmithTaskIntent): string[] {
     case "general":
       return ["Keep the contract helpful without pretending to know more than the draft provides."];
   }
-}
-
-function describeFamily(family: PromptsmithFamily): string {
-  return family === "claude" ? "Claude-style" : "GPT-style";
 }

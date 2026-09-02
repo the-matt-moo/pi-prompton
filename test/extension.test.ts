@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
-import { createPromptsmithExtension } from "../src/index.js";
+import { createPromptonExtension } from "../src/index.js";
 import { createCommandContext, createMockPi, createPersistedRuntimeState } from "./helpers.js";
 
-void test("extension registers the promptsmith command and shortcut", () => {
+void test("extension registers the prompton command and shortcut", () => {
   const harness = createMockPi();
 
-  createPromptsmithExtension(harness.pi);
+  createPromptonExtension(harness.pi);
 
   assert.ok(harness.commands.has(EXTENSION_COMMAND));
   assert.ok(harness.shortcuts.has(DEFAULT_SHORTCUT_KEY));
@@ -20,7 +20,7 @@ void test("default shortcut does not ignore disabled custom shortcut settings", 
     shortcutKey: "ctrl+alt+p",
     shortcutEnabled: false,
   });
-  createPromptsmithExtension(harness.pi, { runtime });
+  createPromptonExtension(harness.pi, { runtime });
 
   const ctx = createCommandContext({ editorText: "draft" });
   const sessionStartHandlers = harness.events.get("session_start") ?? [];
@@ -38,7 +38,7 @@ void test("default shortcut does not ignore disabled custom shortcut settings", 
 void test("custom editor is not reinstalled when the shortcut setting is unchanged", async () => {
   const harness = createMockPi();
   const runtime = createPersistedRuntimeState({ shortcutKey: "ctrl+alt+p" });
-  createPromptsmithExtension(harness.pi, { runtime });
+  createPromptonExtension(harness.pi, { runtime });
 
   const ctx = createCommandContext({ editorText: "draft" });
   for (const handler of harness.events.get("session_start") ?? []) {
@@ -62,7 +62,7 @@ void test("session shutdown restores an existing custom editor component", async
   });
   const harness = createMockPi();
   const runtime = createPersistedRuntimeState({ shortcutKey: "ctrl+alt+p" });
-  createPromptsmithExtension(harness.pi, { runtime });
+  createPromptonExtension(harness.pi, { runtime });
 
   const ctx = createCommandContext({
     editorText: "draft",
@@ -89,7 +89,7 @@ void test("session shutdown restores an existing custom editor component", async
 void test("session shutdown clears the custom editor component", async () => {
   const harness = createMockPi();
   const runtime = createPersistedRuntimeState({ shortcutKey: "ctrl+alt+p" });
-  createPromptsmithExtension(harness.pi, { runtime });
+  createPromptonExtension(harness.pi, { runtime });
 
   const ctx = createCommandContext({ editorText: "draft" });
   for (const handler of harness.events.get("session_start") ?? []) {

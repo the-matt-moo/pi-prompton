@@ -1,6 +1,6 @@
-import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "./types.js";
+import type { ModelRef, PromptonFamily, PromptonSettings } from "./types.js";
 
-export function setActiveEnhancerModelMode(settings: PromptsmithSettings): PromptsmithSettings {
+export function setActiveEnhancerModelMode(settings: PromptonSettings): PromptonSettings {
   const next = { ...settings, enhancerModelMode: "active" as const };
   delete next.fixedEnhancerModel;
   delete next.familyEnhancerModels;
@@ -8,9 +8,9 @@ export function setActiveEnhancerModelMode(settings: PromptsmithSettings): Promp
 }
 
 export function setFixedEnhancerModel(
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   modelRef: ModelRef
-): PromptsmithSettings {
+): PromptonSettings {
   return {
     ...setActiveEnhancerModelMode(settings),
     enhancerModelMode: "fixed",
@@ -18,7 +18,7 @@ export function setFixedEnhancerModel(
   };
 }
 
-export function clearFixedEnhancerModel(settings: PromptsmithSettings): PromptsmithSettings {
+export function clearFixedEnhancerModel(settings: PromptonSettings): PromptonSettings {
   if (settings.enhancerModelMode === "fixed") {
     return setActiveEnhancerModelMode(settings);
   }
@@ -29,10 +29,10 @@ export function clearFixedEnhancerModel(settings: PromptsmithSettings): Promptsm
 }
 
 export function setFamilyEnhancerModel(
-  settings: PromptsmithSettings,
-  family: PromptsmithFamily,
+  settings: PromptonSettings,
+  family: PromptonFamily,
   modelRef: ModelRef
-): PromptsmithSettings {
+): PromptonSettings {
   const familyEnhancerModels = {
     ...(settings.familyEnhancerModels ?? {}),
     [family]: modelRef,
@@ -43,7 +43,7 @@ export function setFamilyEnhancerModel(
       : settings.enhancerModelMode === "fixed"
         ? ("active" as const)
         : settings.enhancerModelMode;
-  const next: PromptsmithSettings = {
+  const next: PromptonSettings = {
     ...settings,
     enhancerModelMode,
     familyEnhancerModels,
@@ -56,9 +56,9 @@ export function setFamilyEnhancerModel(
 }
 
 export function clearFamilyEnhancerModel(
-  settings: PromptsmithSettings,
-  family: PromptsmithFamily
-): PromptsmithSettings {
+  settings: PromptonSettings,
+  family: PromptonFamily
+): PromptonSettings {
   if (settings.enhancerModelMode === "family-linked") {
     return setActiveEnhancerModelMode(settings);
   }

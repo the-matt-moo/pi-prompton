@@ -4,9 +4,9 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { handlePromptsmithCommand } from "../src/commands.js";
+import { handlePromptonCommand } from "../src/commands.js";
 import { resolveEditorDraft } from "../src/editor-draft.js";
-import { PromptsmithRuntimeState } from "../src/state.js";
+import { PromptonRuntimeState } from "../src/state.js";
 import { runSettingsAction } from "../src/ui/settings-actions.js";
 import { openSelectDialog } from "../src/ui/select-dialog.js";
 import {
@@ -185,7 +185,7 @@ void test("select dialog truncates long titles to the available width", async ()
   });
 
   await openSelectDialog(ctx, {
-    title: "Promptsmith settings title that should truncate",
+    title: "Prompton settings title that should truncate",
     items: [{ value: "one", label: "one" }],
   });
 
@@ -205,7 +205,7 @@ void test("resolveEditorDraft rejects multiple paste markers without reading the
         execCalls += 1;
         return Promise.resolve({ stdout: "abc", stderr: "", code: 0, killed: false });
       }),
-    /Promptsmith found Pi paste markers/
+    /Prompton found Pi paste markers/
   );
 
   assert.equal(execCalls, 0);
@@ -287,10 +287,10 @@ void test("resolveEditorDraft logs clipboard command failures before giving up",
 
     await assert.rejects(
       resolveEditorDraft(ctx, () => Promise.reject(new Error("pbpaste failed"))),
-      /Promptsmith found Pi paste markers/
+      /Prompton found Pi paste markers/
     );
 
-    assert.match(loggedErrors.join("\n"), /Promptsmith failed to read the clipboard/i);
+    assert.match(loggedErrors.join("\n"), /Prompton failed to read the clipboard/i);
     assert.match(loggedErrors.join("\n"), /pbpaste failed/i);
   } finally {
     console.error = originalConsoleError;
@@ -501,11 +501,11 @@ void test("settings actions let users choose auto-send behavior while busy", asy
 });
 
 void test("settings actions report persistence failures without throwing", async () => {
-  const tempDir = mkdtempSync(join(tmpdir(), "promptsmith-ui-state-"));
+  const tempDir = mkdtempSync(join(tmpdir(), "prompton-ui-state-"));
   const filePath = join(tempDir, "not-a-directory");
   writeFileSync(filePath, "x", "utf8");
 
-  const runtime = new PromptsmithRuntimeState(join(filePath, "promptsmith-settings.json"));
+  const runtime = new PromptonRuntimeState(join(filePath, "prompton-settings.json"));
   const previousSettings = runtime.getSettings();
   const ctx = createCommandContext();
   let refreshCount = 0;
@@ -525,7 +525,7 @@ void test("settings actions report persistence failures without throwing", async
   assert.equal(ctx.uiState.notifications.at(-1)?.type, "error");
   assert.match(
     ctx.uiState.notifications.at(-1)?.message ?? "",
-    /failed to save promptsmith settings/i
+    /failed to save prompton settings/i
   );
 });
 
@@ -606,13 +606,13 @@ void test("enhancement retries once when the first model response breaks the sen
   const ctx = createCommandContext({ model: createModel(), editorText: "fix this prompt" });
 
   let callCount = 0;
-  await handlePromptsmithCommand("", ctx, runtime, {
+  await handlePromptonCommand("", ctx, runtime, {
     completeFn: () => {
       callCount += 1;
       return Promise.resolve(
         callCount === 1
           ? createAssistantResponse(
-              "Sure — here is the improved prompt:\n<promptsmith-enhanced-prompt>Retry me</promptsmith-enhanced-prompt>"
+              "Sure — here is the improved prompt:\n<prompton-enhanced-prompt>Retry me</prompton-enhanced-prompt>"
             )
           : createCompleteResponse("Recovered prompt")
       );

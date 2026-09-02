@@ -1,4 +1,12 @@
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import {
+  runClarifyCommand,
+  runCoachCommand,
+  runHistoryCommand,
+  runLintCommand,
+  runScoreCommand,
+  runTemplateCommand,
+} from "./coaching-commands.js";
 import { HELP_LINES } from "./constants.js";
 import {
   setActiveEnhancerModelMode,
@@ -12,12 +20,12 @@ import {
   upsertExactModelOverride,
   upsertFamilyOverride,
 } from "./overrides.js";
-import type { PromptsmithRuntimeState } from "./state.js";
+import type { PromptonRuntimeState } from "./state.js";
 import type {
-  ParsedPromptsmithCommand,
-  PromptsmithFamily,
-  PromptsmithRewriteMode,
-  PromptsmithSettings,
+  ParsedPromptonCommand,
+  PromptonFamily,
+  PromptonRewriteMode,
+  PromptonSettings,
 } from "./types.js";
 import { openSettingsUi, resetGlobalSettings } from "./ui/settings.js";
 import { buildStatusReport } from "./ui/status.js";
@@ -25,20 +33,19 @@ import { detectRuntimeSupport, parseEnhancementTimeoutSeconds, parseOnOff } from
 
 type CommandServices = EnhancementServices;
 
-export async function handlePromptsmithCommand(
+export async function handlePromptonCommand(
   rawArgs: string,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices
 ): Promise<void> {
-  const command = parsePromptsmithCommand(rawArgs);
+  const command = parsePromptonCommand(rawArgs);
 
   try {
     switch (command.name) {
       case "":
-        if (shouldOpenSettingsByDefault(ctx)) {
-          notify(ctx, "Editor is empty — opening Promptsmith settings.");
-          await openSettingsUi(ctx, runtime, services);
+        if (detectRuntimeSupport(ctx).interactiveTui && !ctx.ui.getEditorText().trim()) {
+          await runTemplateCommand(ctx, runtime);
           return;
         }
         await enhanceEditorDraft(ctx, runtime, services);
@@ -61,7 +68,7 @@ export async function handlePromptsmithCommand(
           runtime,
           services,
           { ...runtime.getSettings(), enabled: true },
-          "Promptsmith enabled."
+          "Prompton enabled."
         );
         return;
       case "disable":
@@ -70,7 +77,7 @@ export async function handlePromptsmithCommand(
           runtime,
           services,
           { ...runtime.getSettings(), enabled: false },
-          "Promptsmith disabled."
+          "Prompton disabled."
         );
         return;
       case "family":
@@ -154,6 +161,45 @@ export async function handlePromptsmithCommand(
       case "timeout":
         handleTimeoutCommand(command, ctx, runtime, services);
         return;
+      case "clarify":
+        if (command.args.length > 0) {
+          handleBooleanSettingCommand(
+            command,
+            ctx,
+            runtime,
+            services,
+            "clarifyEnabled",
+            "Clarify setting updated."
+          );
+        } else {
+          await runClarifyCommand(ctx, runtime);
+        }
+        return;
+      case "clarify-on-shortcut":
+        handleBooleanSettingCommand(
+          command,
+          ctx,
+          runtime,
+          services,
+          "clarifyOnShortcut",
+          "Clarify-on-shortcut setting updated."
+        );
+        return;
+      case "lint":
+        runLintCommand(ctx);
+        return;
+      case "score":
+        await runScoreCommand(ctx, runtime, services);
+        return;
+      case "coach":
+        await runCoachCommand(ctx, runtime, services);
+        return;
+      case "template":
+        await runTemplateCommand(ctx, runtime);
+        return;
+      case "history":
+        await runHistoryCommand(ctx, runtime);
+        return;
       case "help":
       default:
         notify(ctx, HELP_LINES);
@@ -164,7 +210,7 @@ export async function handlePromptsmithCommand(
   }
 }
 
-export function parsePromptsmithCommand(rawArgs: string): ParsedPromptsmithCommand {
+export function parsePromptonCommand(rawArgs: string): ParsedPromptonCommand {
   const trimmed = rawArgs.trim();
   if (!trimmed) {
     return { name: "", args: [] };
@@ -177,7 +223,7 @@ export function parsePromptsmithCommand(rawArgs: string): ParsedPromptsmithComma
   };
 }
 
-export function getPromptsmithArgumentCompletions(
+export function getPromptonArgumentCompletions(
   prefix: string
 ): { value: string; label: string }[] | null {
   const options = [
@@ -200,21 +246,43 @@ export function getPromptsmithArgumentCompletions(
     "auto-send-when-busy",
     "preserve-code",
     "timeout",
+    "clarify",
+    "clarify-on-shortcut",
+    "lint",
+    "score",
+    "coach",
+    "template",
+    "history",
     "help",
   ];
   const loweredPrefix = prefix.toLowerCase();
-  const matches = options.filter((option) => option.startsWith(loweredPrefix));
+  const valueOptions: Record<string, string[]> = {
+    family: ["auto", "gpt", "claude"],
+    mode: ["auto", "plain", "execution-contract"],
+    "enhancer-model": ["active", "fixed", "family-linked"],
+    map: ["active", "set", "add", "remove"],
+    conversation: ["on", "off"],
+    "project-metadata": ["on", "off"],
+    "status-bar": ["on", "off"],
+    strength: ["light", "balanced", "strong"],
+    preview: ["on", "off"],
+    "auto-send": ["on", "off"],
+    "auto-send-when-busy": ["steer", "follow-up"],
+    "preserve-code": ["on", "off"],
+    clarify: ["on", "off"],
+    "clarify-on-shortcut": ["on", "off"],
+  };
+  const [command] = loweredPrefix.trimStart().split(/\s+/, 1);
+  const candidates = prefix.includes(" ")
+    ? (valueOptions[command ?? ""] ?? []).map((value) => `${command} ${value}`)
+    : options;
+  const matches = candidates.filter((option) => option.startsWith(loweredPrefix));
   return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
-}
-
-function shouldOpenSettingsByDefault(ctx: ExtensionCommandContext): boolean {
-  const support = detectRuntimeSupport(ctx);
-  return support.interactiveTui && !ctx.ui.getEditorText().trim();
 }
 
 function handleUndo(
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: Pick<CommandServices, "refreshStatus">
 ): void {
   const support = detectRuntimeSupport(ctx);
@@ -224,23 +292,23 @@ function handleUndo(
 
   const previousDraft = runtime.undo.consume();
   if (!previousDraft) {
-    throw new Error("Promptsmith undo is not available.");
+    throw new Error("Prompton undo is not available.");
   }
 
   ctx.ui.setEditorText(previousDraft);
   services.refreshStatus(ctx);
-  notify(ctx, "Promptsmith restored the previous draft.");
+  notify(ctx, "Prompton restored the previous draft.");
 }
 
 function handleFamilyCommand(
-  command: ParsedPromptsmithCommand,
+  command: ParsedPromptonCommand,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices
 ): void {
   const family = command.args[0];
   if (family !== "auto" && family !== "gpt" && family !== "claude") {
-    throw new Error("Usage: /promptsmith family auto|gpt|claude");
+    throw new Error("Usage: /prompton family auto|gpt|claude");
   }
 
   persistSettings(
@@ -253,14 +321,14 @@ function handleFamilyCommand(
 }
 
 function handleRewriteModeCommand(
-  command: ParsedPromptsmithCommand,
+  command: ParsedPromptonCommand,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices
 ): void {
   const rewriteMode = parseRewriteMode(command.args[0]);
   if (!rewriteMode) {
-    throw new Error("Usage: /promptsmith mode auto|plain|execution-contract");
+    throw new Error("Usage: /prompton mode auto|plain|execution-contract");
   }
 
   persistSettings(
@@ -273,9 +341,9 @@ function handleRewriteModeCommand(
 }
 
 function handleEnhancerModelCommand(
-  command: ParsedPromptsmithCommand,
+  command: ParsedPromptonCommand,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices
 ): void {
   const mode = command.args[0];
@@ -294,7 +362,7 @@ function handleEnhancerModelCommand(
     case "fixed": {
       const modelRef = parseModelRef(command.args[1] ?? "");
       if (!modelRef) {
-        throw new Error("Usage: /promptsmith enhancer-model fixed <provider>/<id>");
+        throw new Error("Usage: /prompton enhancer-model fixed <provider>/<id>");
       }
       persistSettings(
         ctx,
@@ -310,7 +378,7 @@ function handleEnhancerModelCommand(
       const claudeModel = parseModelRef(command.args[2] ?? "");
       if (!gptModel || !claudeModel) {
         throw new Error(
-          "Usage: /promptsmith enhancer-model family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>"
+          "Usage: /prompton enhancer-model family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>"
         );
       }
       const next = setFamilyEnhancerModel(
@@ -323,15 +391,15 @@ function handleEnhancerModelCommand(
     }
     default:
       throw new Error(
-        "Usage: /promptsmith enhancer-model active|fixed <provider>/<id>|family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>"
+        "Usage: /prompton enhancer-model active|fixed <provider>/<id>|family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>"
       );
   }
 }
 
 function handleMapCommand(
-  command: ParsedPromptsmithCommand,
+  command: ParsedPromptonCommand,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices
 ): void {
   const action = command.args[0];
@@ -341,10 +409,10 @@ function handleMapCommand(
     case "active": {
       const family = parseFamily(command.args[1]);
       if (!family) {
-        throw new Error("Usage: /promptsmith map active <gpt|claude>");
+        throw new Error("Usage: /prompton map active <gpt|claude>");
       }
       if (!ctx.model) {
-        throw new Error("Promptsmith needs an active model for /promptsmith map active <family>.");
+        throw new Error("Prompton needs an active model for /prompton map active <family>.");
       }
       const next = upsertExactModelOverride(
         settings,
@@ -364,7 +432,7 @@ function handleMapCommand(
       const modelRef = parseModelRef(command.args[1] ?? "");
       const family = parseFamily(command.args[2]);
       if (!modelRef || !family) {
-        throw new Error("Usage: /promptsmith map set <provider>/<id> <gpt|claude>");
+        throw new Error("Usage: /prompton map set <provider>/<id> <gpt|claude>");
       }
       const next = upsertExactModelOverride(settings, modelRef, family);
       persistSettings(
@@ -380,7 +448,7 @@ function handleMapCommand(
       const pattern = command.args[1]?.trim();
       const family = parseFamily(command.args[2]);
       if (!pattern || !family) {
-        throw new Error("Usage: /promptsmith map add <pattern> <gpt|claude>");
+        throw new Error("Usage: /prompton map add <pattern> <gpt|claude>");
       }
       const next = upsertFamilyOverride(settings, pattern, family);
       persistSettings(ctx, runtime, services, next, `Pattern ${pattern} now routes to ${family}.`);
@@ -389,7 +457,7 @@ function handleMapCommand(
     case "remove": {
       const pattern = command.args[1]?.trim();
       if (!pattern) {
-        throw new Error("Usage: /promptsmith map remove <pattern>");
+        throw new Error("Usage: /prompton map remove <pattern>");
       }
       const next = removeFamilyOverride(settings, pattern);
       persistSettings(ctx, runtime, services, next, `Removed pattern override ${pattern}.`);
@@ -397,36 +465,36 @@ function handleMapCommand(
     }
     default:
       throw new Error(
-        "Usage: /promptsmith map active <family> | set <provider>/<id> <family> | add <pattern> <family> | remove <pattern>"
+        "Usage: /prompton map active <family> | set <provider>/<id> <family> | add <pattern> <family> | remove <pattern>"
       );
   }
 }
 
 function handleBooleanSettingCommand<K extends BooleanSettingKey>(
-  command: ParsedPromptsmithCommand,
+  command: ParsedPromptonCommand,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices,
   key: K,
   message: string
 ): void {
   const boolValue = parseOnOff(command.args[0] ?? "");
   if (boolValue === undefined) {
-    throw new Error(`Usage: /promptsmith ${command.name} on|off`);
+    throw new Error(`Usage: /prompton ${command.name} on|off`);
   }
 
   persistSettings(ctx, runtime, services, { ...runtime.getSettings(), [key]: boolValue }, message);
 }
 
 function handleStrengthCommand(
-  command: ParsedPromptsmithCommand,
+  command: ParsedPromptonCommand,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices
 ): void {
   const strength = command.args[0];
   if (strength !== "light" && strength !== "balanced" && strength !== "strong") {
-    throw new Error("Usage: /promptsmith strength light|balanced|strong");
+    throw new Error("Usage: /prompton strength light|balanced|strong");
   }
 
   persistSettings(
@@ -439,14 +507,14 @@ function handleStrengthCommand(
 }
 
 function handleAutoSendBusyBehaviorCommand(
-  command: ParsedPromptsmithCommand,
+  command: ParsedPromptonCommand,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices
 ): void {
   const behavior = parseAutoSendBusyBehavior(command.args[0]);
   if (!behavior) {
-    throw new Error("Usage: /promptsmith auto-send-when-busy steer|follow-up");
+    throw new Error("Usage: /prompton auto-send-when-busy steer|follow-up");
   }
 
   persistSettings(
@@ -459,14 +527,14 @@ function handleAutoSendBusyBehaviorCommand(
 }
 
 function handleTimeoutCommand(
-  command: ParsedPromptsmithCommand,
+  command: ParsedPromptonCommand,
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: CommandServices
 ): void {
   const timeoutMs = parseEnhancementTimeoutSeconds(command.args[0] ?? "");
   if (timeoutMs === undefined) {
-    throw new Error("Usage: /promptsmith timeout <seconds> (5-300)");
+    throw new Error("Usage: /prompton timeout <seconds> (5-300)");
   }
 
   persistSettings(
@@ -478,11 +546,11 @@ function handleTimeoutCommand(
   );
 }
 
-function parseFamily(value: string | undefined): PromptsmithFamily | undefined {
+function parseFamily(value: string | undefined): PromptonFamily | undefined {
   return value === "gpt" || value === "claude" ? value : undefined;
 }
 
-function parseRewriteMode(value: string | undefined): PromptsmithRewriteMode | undefined {
+function parseRewriteMode(value: string | undefined): PromptonRewriteMode | undefined {
   return value === "auto" || value === "plain" || value === "execution-contract"
     ? value
     : undefined;
@@ -490,7 +558,7 @@ function parseRewriteMode(value: string | undefined): PromptsmithRewriteMode | u
 
 function parseAutoSendBusyBehavior(
   value: string | undefined
-): PromptsmithSettings["autoSendBusyBehavior"] | undefined {
+): PromptonSettings["autoSendBusyBehavior"] | undefined {
   return value === "steer" || value === "followUp" || value === "follow-up"
     ? value === "follow-up"
       ? "followUp"
@@ -504,9 +572,9 @@ function formatTimeoutSeconds(timeoutMs: number): string {
 
 function persistSettings(
   ctx: ExtensionCommandContext,
-  runtime: PromptsmithRuntimeState,
+  runtime: PromptonRuntimeState,
   services: Pick<CommandServices, "refreshStatus">,
-  settings: PromptsmithSettings,
+  settings: PromptonSettings,
   successMessage: string
 ): void {
   runtime.persistSettings(settings);
@@ -520,7 +588,9 @@ type BooleanSettingKey =
   | "statusBarEnabled"
   | "previewBeforeReplace"
   | "autoSendEnhancedPrompt"
-  | "preserveCodeBlocks";
+  | "preserveCodeBlocks"
+  | "clarifyEnabled"
+  | "clarifyOnShortcut";
 
 function notify(
   ctx: { hasUI: boolean; ui: { notify: (message: string, type?: "info" | "error") => void } },

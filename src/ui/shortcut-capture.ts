@@ -37,7 +37,7 @@ class ShortcutCaptureDialog implements Component {
 
   render(width: number): string[] {
     return [
-      this.theme.fg("accent", truncateToWidth(this.theme.bold("Set Promptsmith shortcut"), width)),
+      this.theme.fg("accent", truncateToWidth(this.theme.bold("Set Prompton shortcut"), width)),
       this.theme.fg(
         "dim",
         truncateToWidth(

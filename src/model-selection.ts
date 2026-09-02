@@ -2,24 +2,22 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import type {
   ModelRef,
-  PromptsmithFamily,
-  PromptsmithRequestAuth,
-  PromptsmithSettings,
+  PromptonFamily,
+  PromptonRequestAuth,
+  PromptonSettings,
   ResolvedEnhancerModel,
 } from "./types.js";
 
 export async function resolveEnhancerModel(
-  settings: PromptsmithSettings,
-  targetFamily: PromptsmithFamily,
+  settings: PromptonSettings,
+  targetFamily: PromptonFamily,
   activeModel: Model<Api> | undefined,
   modelRegistry: ModelRegistry
 ): Promise<ResolvedEnhancerModel> {
   switch (settings.enhancerModelMode) {
     case "active": {
       if (!activeModel) {
-        throw new Error(
-          "Promptsmith requires an active model when enhancer-model mode is 'active'."
-        );
+        throw new Error("Prompton requires an active model when enhancer-model mode is 'active'.");
       }
       const requestAuth = await resolveRequestAuth(modelRegistry, activeModel);
       return {
@@ -35,7 +33,7 @@ export async function resolveEnhancerModel(
       const fixedRef = settings.fixedEnhancerModel;
       if (!fixedRef) {
         throw new Error(
-          "Promptsmith enhancer-model mode is 'fixed', but no fixed enhancer model is configured."
+          "Prompton enhancer-model mode is 'fixed', but no fixed enhancer model is configured."
         );
       }
       return resolveConfiguredModel(modelRegistry, targetFamily, fixedRef, "fixed");
@@ -48,7 +46,7 @@ export async function resolveEnhancerModel(
           : settings.familyEnhancerModels?.claude;
       if (!familyRef) {
         throw new Error(
-          `Promptsmith enhancer-model mode is 'family-linked', but no ${targetFamily} enhancer model is configured.`
+          `Prompton enhancer-model mode is 'family-linked', but no ${targetFamily} enhancer model is configured.`
         );
       }
       return resolveConfiguredModel(modelRegistry, targetFamily, familyRef, "family-linked");
@@ -56,7 +54,7 @@ export async function resolveEnhancerModel(
 
     default:
       throw new Error(
-        `Promptsmith received unsupported enhancer-model mode: ${String(settings.enhancerModelMode)}.`
+        `Prompton received unsupported enhancer-model mode: ${String(settings.enhancerModelMode)}.`
       );
   }
 }
@@ -78,14 +76,14 @@ export function parseModelRef(value: string): ModelRef | undefined {
 
 async function resolveConfiguredModel(
   modelRegistry: ModelRegistry,
-  targetFamily: PromptsmithFamily,
+  targetFamily: PromptonFamily,
   modelRef: ModelRef,
   mode: ResolvedEnhancerModel["mode"]
 ): Promise<ResolvedEnhancerModel> {
   const model = modelRegistry.find(modelRef.provider, modelRef.id);
   if (!model) {
     throw new Error(
-      `Promptsmith could not find the configured enhancer model ${modelRef.provider}/${modelRef.id}.`
+      `Prompton could not find the configured enhancer model ${modelRef.provider}/${modelRef.id}.`
     );
   }
 
@@ -102,11 +100,11 @@ async function resolveConfiguredModel(
 async function resolveRequestAuth(
   modelRegistry: ModelRegistry,
   model: Model<Api>
-): Promise<PromptsmithRequestAuth> {
+): Promise<PromptonRequestAuth> {
   const auth = await modelRegistry.getApiKeyAndHeaders(model);
   if (!auth.ok) {
     throw new Error(
-      `Promptsmith could not resolve request auth for ${model.provider}/${model.id}: ${auth.error}`
+      `Prompton could not resolve request auth for ${model.provider}/${model.id}: ${auth.error}`
     );
   }
 

@@ -1,6 +1,6 @@
 {
-  "name": "pi-promptsmith",
-  "version": "0.4.0",
+  "name": "pi-prompton",
+  "version": "0.5.0",
   "description": "Intent-aware prompt rewriter and execution-contract compiler for Pi",
   "keywords": [
     "pi-package",
@@ -8,13 +8,14 @@
     "prompt-enhancer",
     "prompt-engineering",
     "coding-agent",
-    "promptsmith",
+    "prompton",
     "ai"
   ],
   "type": "module",
   "main": "./src/index.ts",
   "files": [
     "src/",
+    "assets/",
     "README.md",
     "LICENSE"
   ],
@@ -34,15 +35,15 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/ayagmar/pi-promptsmith/main/promptsmith.gif"
+    "image": "https://raw.githubusercontent.com/ayagmar/pi-prompton/main/prompton.gif"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ayagmar/pi-promptsmith.git"
+    "url": "git+https://github.com/ayagmar/pi-prompton.git"
   },
-  "homepage": "https://github.com/ayagmar/pi-promptsmith#readme",
+  "homepage": "https://github.com/ayagmar/pi-prompton#readme",
   "bugs": {
-    "url": "https://github.com/ayagmar/pi-promptsmith/issues"
+    "url": "https://github.com/ayagmar/pi-prompton/issues"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

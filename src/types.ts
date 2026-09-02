@@ -1,14 +1,14 @@
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
 import type { ExtensionContext, ModelRegistry } from "@earendil-works/pi-coding-agent";
 
-export type PromptsmithFamily = "gpt" | "claude";
-export type PromptsmithTargetFamilyMode = "auto" | PromptsmithFamily;
-export type PromptsmithEnhancerModelMode = "active" | "fixed" | "family-linked";
-export type PromptsmithRewriteStrength = "light" | "balanced" | "strong";
-export type PromptsmithRewriteMode = "auto" | "plain" | "execution-contract";
-export type PromptsmithEffectiveRewriteMode = Exclude<PromptsmithRewriteMode, "auto">;
-export type PromptsmithAutoSendBusyBehavior = "steer" | "followUp";
-export type PromptsmithTaskIntent =
+export type PromptonFamily = "gpt" | "claude";
+export type PromptonTargetFamilyMode = "auto" | PromptonFamily;
+export type PromptonEnhancerModelMode = "active" | "fixed" | "family-linked";
+export type PromptonRewriteStrength = "light" | "balanced" | "strong";
+export type PromptonRewriteMode = "auto" | "plain" | "execution-contract";
+export type PromptonEffectiveRewriteMode = Exclude<PromptonRewriteMode, "auto">;
+export type PromptonAutoSendBusyBehavior = "steer" | "followUp";
+export type PromptonTaskIntent =
   | "implement"
   | "debug"
   | "refactor"
@@ -25,12 +25,12 @@ export interface ModelRef {
 }
 
 export interface ExactModelOverride extends ModelRef {
-  family: PromptsmithFamily;
+  family: PromptonFamily;
 }
 
 export interface FamilyOverride {
   pattern: string;
-  family: PromptsmithFamily;
+  family: PromptonFamily;
 }
 
 export interface FamilyEnhancerModels {
@@ -38,46 +38,48 @@ export interface FamilyEnhancerModels {
   claude?: ModelRef;
 }
 
-export interface PromptsmithSettings {
+export interface PromptonSettings {
   version: 1;
   enabled: boolean;
   shortcutEnabled: boolean;
   shortcutKey: string;
-  targetFamilyMode: PromptsmithTargetFamilyMode;
-  fallbackFamily: PromptsmithFamily;
+  targetFamilyMode: PromptonTargetFamilyMode;
+  fallbackFamily: PromptonFamily;
   exactModelOverrides: ExactModelOverride[];
   familyOverrides: FamilyOverride[];
-  enhancerModelMode: PromptsmithEnhancerModelMode;
+  enhancerModelMode: PromptonEnhancerModelMode;
   fixedEnhancerModel?: ModelRef;
   familyEnhancerModels?: FamilyEnhancerModels;
   includeRecentConversation: boolean;
   includeProjectMetadata: boolean;
   statusBarEnabled: boolean;
-  rewriteStrength: PromptsmithRewriteStrength;
-  rewriteMode: PromptsmithRewriteMode;
+  rewriteStrength: PromptonRewriteStrength;
+  rewriteMode: PromptonRewriteMode;
   previewBeforeReplace: boolean;
   autoSendEnhancedPrompt: boolean;
-  autoSendBusyBehavior: PromptsmithAutoSendBusyBehavior;
+  autoSendBusyBehavior: PromptonAutoSendBusyBehavior;
   preserveCodeBlocks: boolean;
   enhancementTimeoutMs: number;
+  clarifyEnabled: boolean;
+  clarifyOnShortcut: boolean;
 }
 
 export interface ResolvedTargetFamily {
-  family: PromptsmithFamily;
+  family: PromptonFamily;
   source: "forced" | "exact-override" | "pattern-override" | "builtin" | "fallback";
   matchedRule?: string;
 }
 
-export type PromptsmithRequestAuth = Pick<
+export type PromptonRequestAuth = Pick<
   Extract<Awaited<ReturnType<ModelRegistry["getApiKeyAndHeaders"]>>, { ok: true }>,
   "apiKey" | "headers"
 >;
 
 export interface ResolvedEnhancerModel {
-  mode: PromptsmithEnhancerModelMode;
-  family: PromptsmithFamily;
+  mode: PromptonEnhancerModelMode;
+  family: PromptonFamily;
   model: Model<Api>;
-  requestAuth: PromptsmithRequestAuth;
+  requestAuth: PromptonRequestAuth;
   label: string;
 }
 
@@ -93,14 +95,14 @@ export interface ProjectMetadata {
   gitBranch?: string;
 }
 
-export interface PromptsmithContextPayload {
+export interface PromptonContextPayload {
   draft: string;
   activeModel?: ModelRef;
-  targetFamily: PromptsmithFamily;
-  rewriteStrength: PromptsmithRewriteStrength;
-  configuredRewriteMode: PromptsmithRewriteMode;
-  effectiveRewriteMode: PromptsmithEffectiveRewriteMode;
-  intent: PromptsmithTaskIntent;
+  targetFamily: PromptonFamily;
+  rewriteStrength: PromptonRewriteStrength;
+  configuredRewriteMode: PromptonRewriteMode;
+  effectiveRewriteMode: PromptonEffectiveRewriteMode;
+  intent: PromptonTaskIntent;
   preserveCodeBlocks: boolean;
   recentConversation: ConversationExcerpt[];
   projectMetadata?: ProjectMetadata;
@@ -110,16 +112,16 @@ export interface PromptsmithContextPayload {
 export interface EnhancementPreparation {
   resolvedTargetFamily: ResolvedTargetFamily;
   enhancerModel: ResolvedEnhancerModel;
-  promptContext: PromptsmithContextPayload;
+  promptContext: PromptonContextPayload;
   request: Context;
 }
 
-export interface PromptsmithDraftResolution {
-  intent: PromptsmithTaskIntent;
-  effectiveRewriteMode: PromptsmithEffectiveRewriteMode;
+export interface PromptonDraftResolution {
+  intent: PromptonTaskIntent;
+  effectiveRewriteMode: PromptonEffectiveRewriteMode;
 }
 
-export interface PromptsmithEnhancementAttempt {
+export interface PromptonEnhancementAttempt {
   outcome: "success" | "cancelled" | "failed";
   enhancerModel?: ModelRef;
   retryUsed: boolean;
@@ -127,24 +129,24 @@ export interface PromptsmithEnhancementAttempt {
   detail?: string;
 }
 
-export interface PromptsmithStatusSnapshot {
-  settings: PromptsmithSettings;
+export interface PromptonStatusSnapshot {
+  settings: PromptonSettings;
   activeModel?: ModelRef;
   resolvedTargetFamily?: ResolvedTargetFamily;
   enhancerModeLabel: string;
   busy: boolean;
   undoAvailable: boolean;
-  currentDraftResolution?: PromptsmithDraftResolution;
-  lastDraftResolution?: PromptsmithDraftResolution;
-  lastEnhancementAttempt?: PromptsmithEnhancementAttempt;
+  currentDraftResolution?: PromptonDraftResolution;
+  lastDraftResolution?: PromptonDraftResolution;
+  lastEnhancementAttempt?: PromptonEnhancementAttempt;
 }
 
-export interface PromptsmithRuntimeSupport {
+export interface PromptonRuntimeSupport {
   interactiveTui: boolean;
   reason?: string;
 }
 
-export interface ParsedPromptsmithCommand {
+export interface ParsedPromptonCommand {
   name: string;
   args: string[];
 }
@@ -152,9 +154,9 @@ export interface ParsedPromptsmithCommand {
 export interface BuildPromptContextOptions {
   ctx: ExtensionContext;
   draft: string;
-  settings: PromptsmithSettings;
+  settings: PromptonSettings;
   activeModel: Model<Api> | undefined;
-  targetFamily: PromptsmithFamily;
+  targetFamily: PromptonFamily;
   enhancerModel: Model<Api>;
   exec: (
     command: string,

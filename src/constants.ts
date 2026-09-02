@@ -1,13 +1,13 @@
-import type { PromptsmithSettings } from "./types.js";
+import type { PromptonSettings } from "./types.js";
 
-export const EXTENSION_NAME = "pi-promptsmith";
-export const EXTENSION_COMMAND = "promptsmith";
+export const EXTENSION_NAME = "pi-prompton";
+export const EXTENSION_COMMAND = "prompton";
 // Avoid Pi built-ins and common extension collisions.
 export const DEFAULT_SHORTCUT_KEY = "alt+p";
 
 export const SETTINGS_VERSION = 1;
-export const SENTINEL_OPEN = "<promptsmith-enhanced-prompt>";
-export const SENTINEL_CLOSE = "</promptsmith-enhanced-prompt>";
+export const SENTINEL_OPEN = "<prompton-enhanced-prompt>";
+export const SENTINEL_CLOSE = "</prompton-enhanced-prompt>";
 
 export const MAX_STATUS_MODEL_ID_LENGTH = 28;
 export const ESTIMATED_FIXED_PROMPT_OVERHEAD_TOKENS = 1_200;
@@ -21,7 +21,7 @@ export const MIN_ENHANCEMENT_TIMEOUT_MS = 5_000;
 export const DEFAULT_ENHANCEMENT_TIMEOUT_MS = 45_000;
 export const MAX_ENHANCEMENT_TIMEOUT_MS = 300_000;
 
-export const DEFAULT_SETTINGS: PromptsmithSettings = {
+export const DEFAULT_SETTINGS: PromptonSettings = {
   version: SETTINGS_VERSION,
   enabled: true,
   shortcutEnabled: true,
@@ -41,6 +41,8 @@ export const DEFAULT_SETTINGS: PromptsmithSettings = {
   autoSendBusyBehavior: "steer",
   preserveCodeBlocks: true,
   enhancementTimeoutMs: DEFAULT_ENHANCEMENT_TIMEOUT_MS,
+  clarifyEnabled: false,
+  clarifyOnShortcut: false,
 };
 
 export const HELP_LINES = [
@@ -68,4 +70,12 @@ export const HELP_LINES = [
   `/${EXTENSION_COMMAND} auto-send-when-busy steer|follow-up`,
   `/${EXTENSION_COMMAND} preserve-code on|off`,
   `/${EXTENSION_COMMAND} timeout <seconds>`,
+  `/${EXTENSION_COMMAND} clarify`,
+  `/${EXTENSION_COMMAND} clarify on|off`,
+  `/${EXTENSION_COMMAND} clarify-on-shortcut on|off`,
+  `/${EXTENSION_COMMAND} lint`,
+  `/${EXTENSION_COMMAND} score`,
+  `/${EXTENSION_COMMAND} coach`,
+  `/${EXTENSION_COMMAND} template`,
+  `/${EXTENSION_COMMAND} history`,
 ].join("\n");
