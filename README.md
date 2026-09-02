@@ -32,7 +32,7 @@ Two output styles:
 | **Empty Editor Action**    | Opens settings dialog                   | Opens template picker dialog (both command & shortcut)                      |
 | **Draft History / Undo**   | Single-entry undo (`/promptsmith undo`) | 10-entry ring buffer history (`/prompton history`) + `/prompton undo`       |
 | **Token Estimation**       | None                                    | Token estimate (`~N tokens`) in enhancement notifications                   |
-| **CLI Auto-Completions**   | Subcommands only                        | Subcommands + value completions (`clarify on                                | off`, `family auto | gpt | claude`, etc.) |
+| **CLI Auto-Completions**   | Subcommands only                        | Subcommands + value completions (`clarify on/off`, `family auto/gpt/claude`, etc.) |
 | **Settings Migration**     | N/A                                     | Backward-compatible fallback for legacy `promptsmith-settings.json`         |
 
 ## Installation
