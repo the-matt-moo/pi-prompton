@@ -13,6 +13,28 @@ Two output styles:
 - **Plain rewrite** — tighten and clarify the prompt
 - **Execution contract** — turn a rough task into a compact, agent-executable spec
 
+## Comparison: pi-promptsmith vs pi-prompton
+
+`pi-prompton` is an enhanced fork of [`ayagmar/pi-promptsmith`](https://github.com/ayagmar/pi-promptsmith). Below is a comparison of key features, architecture, and capabilities:
+
+| Feature / Aspect           | `pi-promptsmith` (Upstream)             | `pi-prompton` (This Fork)                                                   |
+| -------------------------- | --------------------------------------- | --------------------------------------------------------------------------- | ------------------ | --- | -------------- |
+| **Package Name**           | `pi-promptsmith`                        | `pi-prompton`                                                               |
+| **Command Prefix**         | `/promptsmith`                          | `/prompton`                                                                 |
+| **Settings File**          | `~/.pi/agent/promptsmith-settings.json` | `~/.pi/agent/prompton-settings.json` (auto-migrates legacy settings)        |
+| **LLM Prompt Strategy**    | Dual-strategy (`gpt.ts` & `claude.ts`)  | Unified strategy (`unified.ts`) with target-family awareness                |
+| **Prompt Coaching Suite**  | None                                    | `/prompton lint`, `score`, `coach`, `clarify`, `template`, `history`        |
+| **Clarify Mode**           | None                                    | Single-dialog lint + intent clarification before enhancement                |
+| **Prompt Linting**         | None                                    | Local instant linting (`/prompton lint`) for missing verbs, scope, subjects |
+| **Prompt Quality Scoring** | None                                    | LLM-based 1–5 score with top 3 weaknesses (`/prompton score`)               |
+| **Inline Annotations**     | None                                    | `[category: suggestion]` annotations without rewriting (`/prompton coach`)  |
+| **Starter Templates**      | None                                    | 4 intent-based skeletons (`/prompton template`)                             |
+| **Empty Editor Action**    | Opens settings dialog                   | Opens template picker dialog (both command & shortcut)                      |
+| **Draft History / Undo**   | Single-entry undo (`/promptsmith undo`) | 10-entry ring buffer history (`/prompton history`) + `/prompton undo`       |
+| **Token Estimation**       | None                                    | Token estimate (`~N tokens`) in enhancement notifications                   |
+| **CLI Auto-Completions**   | Subcommands only                        | Subcommands + value completions (`clarify on                                | off`, `family auto | gpt | claude`, etc.) |
+| **Settings Migration**     | N/A                                     | Backward-compatible fallback for legacy `promptsmith-settings.json`         |
+
 ## Installation
 
 Run once without installing:

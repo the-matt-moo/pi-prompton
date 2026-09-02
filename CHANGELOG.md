@@ -18,6 +18,7 @@
 * **prompton:** unify GPT/Claude strategy into single request builder; fold best GPT guidance into shared prompt
 * **prompton:** add value completions for common slash-command arguments
 * **readme:** add social card
+* **readme:** add feature comparison table against upstream pi-promptsmith
 
 ### Bug Fixes
 
