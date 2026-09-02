@@ -1,6 +1,12 @@
 # Changelog
 
-## [0.5.0] (Unreleased)
+## [0.5.1]
+
+### Bug Fixes
+
+* **readme:** fix extra separator columns in feature comparison table
+
+## [0.5.0]
 
 ### Features
 

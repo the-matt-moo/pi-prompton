@@ -18,7 +18,7 @@ Two output styles:
 `pi-prompton` is an enhanced fork of [`ayagmar/pi-promptsmith`](https://github.com/ayagmar/pi-promptsmith). Below is a comparison of key features, architecture, and capabilities:
 
 | Feature / Aspect           | `pi-promptsmith` (Upstream)             | `pi-prompton` (This Fork)                                                   |
-| -------------------------- | --------------------------------------- | --------------------------------------------------------------------------- | ------------------ | --- | -------------- |
+| -------------------------- | --------------------------------------- | --------------------------------------------------------------------------- |
 | **Package Name**           | `pi-promptsmith`                        | `pi-prompton`                                                               |
 | **Command Prefix**         | `/promptsmith`                          | `/prompton`                                                                 |
 | **Settings File**          | `~/.pi/agent/promptsmith-settings.json` | `~/.pi/agent/prompton-settings.json` (auto-migrates legacy settings)        |
