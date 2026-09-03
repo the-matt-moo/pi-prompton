@@ -71,6 +71,7 @@ export const HELP_LINES = [
   `/${EXTENSION_COMMAND} lint — run local prompt lint`,
   `/${EXTENSION_COMMAND} score — rate prompt quality`,
   `/${EXTENSION_COMMAND} coach — annotate weak spots inline`,
+  `/${EXTENSION_COMMAND} input — free-form prompt (no template)`,
   `/${EXTENSION_COMMAND} template — pick a prompt skeleton`,
   `/${EXTENSION_COMMAND} history — browse recent drafts`,
   `/${EXTENSION_COMMAND} help — show this list`,

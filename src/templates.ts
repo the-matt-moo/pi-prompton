@@ -13,6 +13,12 @@ interface PromptTemplate {
 
 const TEMPLATES: PromptTemplate[] = [
   {
+    value: "blank",
+    label: "Blank prompt",
+    description: "Free-form prompt, no template",
+    skeleton: "",
+  },
+  {
     value: "implement",
     label: "Implement feature",
     description: "Add or build something new",

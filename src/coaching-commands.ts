@@ -94,6 +94,29 @@ export async function runTemplateCommand(
   ctx.ui.notify("Template loaded. Fill in the [brackets] and run /prompton.");
 }
 
+export async function runInputCommand(
+  ctx: ExtensionCommandContext,
+  runtime: PromptonRuntimeState
+): Promise<void> {
+  const support = detectRuntimeSupport(ctx);
+  if (!support.interactiveTui) throw new Error(support.reason);
+
+  const currentDraft = ctx.ui.getEditorText();
+  if (
+    currentDraft.trim() &&
+    !(await ctx.ui.confirm(
+      "Replace current draft?",
+      "The current editor text will be saved to undo history."
+    ))
+  ) {
+    return;
+  }
+
+  if (currentDraft.trim()) runtime.undo.store(currentDraft);
+  ctx.ui.setEditorText("");
+  ctx.ui.notify("Ready for input. Type your prompt and run /prompton.");
+}
+
 export async function runHistoryCommand(
   ctx: ExtensionCommandContext,
   runtime: PromptonRuntimeState

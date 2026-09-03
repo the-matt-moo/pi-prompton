@@ -3,6 +3,7 @@ import {
   runClarifyCommand,
   runCoachCommand,
   runHistoryCommand,
+  runInputCommand,
   runLintCommand,
   runScoreCommand,
   runTemplateCommand,
@@ -184,6 +185,9 @@ export async function handlePromptonCommand(
           "clarifyOnShortcut",
           "Clarify-on-shortcut setting updated."
         );
+        return;
+      case "input":
+        await runInputCommand(ctx, runtime);
         return;
       case "lint":
         runLintCommand(ctx);

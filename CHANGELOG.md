@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2]
+
+### Features
+
+* **templates:** add "Blank prompt" as first template option for free-form input (no scaffolding)
+* **prompton:** `/prompton input` — clear editor and prepare for free-form prompt entry (alt to template picker)
+
 ## [0.5.1]
 
 ### Bug Fixes
