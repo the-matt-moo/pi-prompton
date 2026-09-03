@@ -17,23 +17,23 @@ Two output styles:
 
 `pi-prompton` is an enhanced fork of [`ayagmar/pi-promptsmith`](https://github.com/ayagmar/pi-promptsmith). Below is a comparison of key features, architecture, and capabilities:
 
-| Feature / Aspect           | `pi-promptsmith` (Upstream)             | `pi-prompton` (This Fork)                                                          |
-| -------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Package Name**           | `pi-promptsmith`                        | `pi-prompton`                                                                      |
-| **Command Prefix**         | `/promptsmith`                          | `/prompton`                                                                        |
-| **Settings File**          | `~/.pi/agent/promptsmith-settings.json` | `~/.pi/agent/prompton-settings.json` (auto-migrates legacy settings)               |
-| **LLM Prompt Strategy**    | Dual-strategy (`gpt.ts` & `claude.ts`)  | Unified strategy (`unified.ts`) with target-family awareness                       |
+| Feature / Aspect           | `pi-promptsmith` (Upstream)             | `pi-prompton` (This Fork)                                                                    |
+| -------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Package Name**           | `pi-promptsmith`                        | `pi-prompton`                                                                                |
+| **Command Prefix**         | `/promptsmith`                          | `/prompton`                                                                                  |
+| **Settings File**          | `~/.pi/agent/promptsmith-settings.json` | `~/.pi/agent/prompton-settings.json` (auto-migrates legacy settings)                         |
+| **LLM Prompt Strategy**    | Dual-strategy (`gpt.ts` & `claude.ts`)  | Unified strategy (`unified.ts`) with target-family awareness                                 |
 | **Prompt Coaching Suite**  | None                                    | `/prompton lint`, `score`, `coach`, `clarify`, `template`, `history` + `auto-clarify` toggle |
-| **Clarify Mode**           | None                                    | Single-dialog lint + intent clarification before enhancement                       |
-| **Prompt Linting**         | None                                    | Local instant linting (`/prompton lint`) for missing verbs, scope, subjects        |
-| **Prompt Quality Scoring** | None                                    | LLM-based 1–5 score with top 3 weaknesses (`/prompton score`)                      |
-| **Inline Annotations**     | None                                    | `[category: suggestion]` annotations without rewriting (`/prompton coach`)         |
-| **Starter Templates**      | None                                    | 4 intent-based skeletons (`/prompton template`)                                    |
-| **Empty Editor Action**    | Opens settings dialog                   | Opens template picker dialog (both command & shortcut)                             |
-| **Draft History / Undo**   | Single-entry undo (`/promptsmith undo`) | 10-entry ring buffer history (`/prompton history`) + `/prompton undo`              |
-| **Token Estimation**       | None                                    | Token estimate (`~N tokens`) in enhancement notifications                          |
-| **CLI Auto-Completions**   | Subcommands only                        | Subcommands + value completions (`auto-clarify on/off`, `family auto/gpt/claude`, etc.) |
-| **Settings Migration**     | N/A                                     | Backward-compatible fallback for legacy `promptsmith-settings.json`                |
+| **Clarify Mode**           | None                                    | Single-dialog lint + intent clarification before enhancement                                 |
+| **Prompt Linting**         | None                                    | Local instant linting (`/prompton lint`) for missing verbs, scope, subjects                  |
+| **Prompt Quality Scoring** | None                                    | LLM-based 1–5 score with top 3 weaknesses (`/prompton score`)                                |
+| **Inline Annotations**     | None                                    | `[category: suggestion]` annotations without rewriting (`/prompton coach`)                   |
+| **Starter Templates**      | None                                    | 4 intent-based skeletons (`/prompton template`)                                              |
+| **Empty Editor Action**    | Opens settings dialog                   | Opens template picker dialog (both command & shortcut)                                       |
+| **Draft History / Undo**   | Single-entry undo (`/promptsmith undo`) | 10-entry ring buffer history (`/prompton history`) + `/prompton undo`                        |
+| **Token Estimation**       | None                                    | Token estimate (`~N tokens`) in enhancement notifications                                    |
+| **CLI Auto-Completions**   | Subcommands only                        | Subcommands + value completions (`auto-clarify on/off`, `family auto/gpt/claude`, etc.)      |
+| **Settings Migration**     | N/A                                     | Backward-compatible fallback for legacy `promptsmith-settings.json`                          |
 
 ## Installation
 
@@ -57,25 +57,33 @@ pi install git:github.com/the-matt-moo/pi-prompton
 
 ## Quick start
 
-**In the editor:**
-1. Type a rough prompt in the Pi editor.
-2. Press **`Alt+P`** (keyboard shortcut) to enhance the draft.
+### Enhance the current editor draft
 
-**Inline (one-off commands with quoted prompts):**
-```bash
-/prompton lint "rough prompt"      # lint inline draft
-/prompton coach 'rough prompt'     # coach inline draft
-/prompton score &#96;rough prompt&#96;   # score inline draft
-/prompton clarify "rough prompt"   # clarify inline draft
+1. Type a rough prompt in the Pi editor.
+2. Press **`Alt+P`** or run `/prompton` as a slash command.
+3. Review the rewritten prompt, then submit it normally.
+
+When the editor is empty, `/prompton` and `Alt+P` open the template picker instead. Choose a template, fill in its `[brackets]`, then enhance again. Choose `/prompton input` when you want a blank editor instead of a template.
+
+### Enhance or inspect a one-off prompt
+
+Pass the draft in matching double quotes, single quotes, or backticks:
+
+```text
+/prompton "rough prompt"           # enhance
+/prompton lint "rough prompt"      # lint locally
+/prompton coach 'rough prompt'     # add inline coaching
+/prompton score `rough prompt`     # score quality
+/prompton clarify "rough prompt"   # append a clarification
 ```
 
-**⚠️ Important:** Do not type `/prompton lint` (or other commands) *bare* in the editor body — they will be sent to the LLM as part of your prompt. Use either:
-- **Editor + Alt+P** (keyboard shortcut on current draft)
-- **`/prompton <command> "quoted prompt"`** (inline command with quoted prompt)
+Quoted input becomes the current editor draft. Run these through Pi's slash-command interface; text merely pasted into the editor is prompt content, not an executed command.
 
-### Undo
+### Undo and history
 
-To revert to the previous draft: `/prompton undo` or use Pi's undo (Ctrl+Z).
+- `/prompton undo` restores the draft from before the last editor-changing action.
+- `/prompton history` restores one of the last 10 drafts changed in the current Pi session.
+- Pi's normal `Ctrl+Z` editor undo also remains available.
 
 ## Rewrite modes
 
@@ -190,26 +198,26 @@ Annotation categories: `vague`, `missing-context`, `unbounded`, `no-verification
 
 ### Clarify
 
-A single dialog shown only when local lint finds missing information. Choose one of three intent-aware suggestions or **Type something** to add your own clarification.
+A single dialog shown only when local lint finds missing information. Choose an intent-aware suggestion or **Type something** to add your own clarification.
 
-```
-/prompton clarify                  run clarify on the current draft (one-shot)
-/prompton auto-clarify on|off      enable/disable clarify before every enhancement
-/prompton clarify-on-shortcut on|off   also clarify on keyboard shortcut
-```
-
-If local lint finds no issues, Clarify is skipped entirely. Press `Esc` to cancel.
-
-### Templates
-
-When the editor is empty, both `/prompton` and the shortcut (`Alt+P`) open the same template picker.
-
-```
-/prompton template        pick a prompt skeleton
-/prompton input           clear editor, ready for free-form prompt
+```text
+/prompton clarify                       clarify the current draft once
+/prompton auto-clarify on|off           clarify before `/prompton` enhancement
+/prompton clarify-on-shortcut on|off    clarify before shortcut enhancement
 ```
 
-Inline drafts can be wrapped in double quotes, single quotes, or backticks for `/prompton`, `/prompton coach`, `/prompton lint`, and `/prompton score`. The opener closes Pi's slash-command dropdown, so the wrapped text is treated as prompt content instead of a command option.
+One-shot clarification appends the selected detail to the editor; run `/prompton` afterward to enhance it. Auto-clarify continues directly to enhancement. If local lint finds no issues, the dialog is skipped. Press `Esc` to cancel without changing the draft.
+
+### Templates and blank input
+
+When the editor is empty, both `/prompton` and the shortcut (`Alt+P`) open the same picker with Implement, Debug, Refactor, and Review templates.
+
+```text
+/prompton template        open the template picker
+/prompton input           clear the editor for free-form input
+```
+
+If the editor already contains text, either command asks before replacing it and saves the old draft to history. Inline drafts can be wrapped in double quotes, single quotes, or backticks for `/prompton`, `/prompton coach`, `/prompton lint`, `/prompton score`, and `/prompton clarify`.
 
 ### History
 
@@ -240,6 +248,7 @@ After every enhancement, the success notification includes an approximate token 
 /prompton template           pick a prompt skeleton
 /prompton input              clear editor for free-form prompt entry
 /prompton history            browse and restore past drafts
+/prompton help               show commands with short descriptions
 ```
 
 Quick config:
