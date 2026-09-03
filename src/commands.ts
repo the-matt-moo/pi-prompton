@@ -43,6 +43,12 @@ export async function handlePromptonCommand(
   const command = parsePromptonCommand(rawArgs);
 
   try {
+    // Inline draft: write to editor before dispatching so all commands that
+    // call requireInteractiveDraft() or getEditorText() pick it up.
+    if (command.inlineDraft && ctx.hasUI) {
+      ctx.ui.setEditorText(command.inlineDraft);
+    }
+
     switch (command.name) {
       case "":
         if (detectRuntimeSupport(ctx).interactiveTui && !ctx.ui.getEditorText().trim()) {
@@ -218,6 +224,20 @@ export function parsePromptonCommand(rawArgs: string): ParsedPromptonCommand {
   const trimmed = rawArgs.trim();
   if (!trimmed) {
     return { name: "", args: [] };
+  }
+
+  const bareInline = trimmed.match(/^(["'`])(.+)\1$/);
+  if (bareInline?.[2]) {
+    return { name: "", args: [], inlineDraft: bareInline[2] };
+  }
+
+  const quotedCommand = trimmed.match(/^(coach|lint|score)\s+(["'`])(.+)\2$/i);
+  if (quotedCommand?.[1] && quotedCommand[3]) {
+    return {
+      name: quotedCommand[1].toLowerCase(),
+      args: [],
+      inlineDraft: quotedCommand[3],
+    };
   }
 
   const args = trimmed.split(/\s+/);

@@ -59,6 +59,12 @@ pi install git:github.com/the-matt-moo/pi-prompton
 
 Write a rough request in the Pi editor, then press `Alt+P` (default) or run `/prompton`.
 
+Inline input also works when wrapped in quotes:
+
+- `/prompton "rough prompt"`
+- `/prompton coach 'rough prompt'`
+- `/prompton score &#96;rough prompt&#96;`
+
 To undo: `/prompton undo`
 
 ## Rewrite modes
@@ -149,6 +155,7 @@ Local, instant, no LLM call. Flags structural weaknesses before enhancement: mis
 
 ```
 /prompton lint
+/prompton lint "rough prompt"
 ```
 
 ### Score
@@ -157,6 +164,7 @@ LLM-based quality rating (1–5) with up to 3 concrete weaknesses. Read-only, ca
 
 ```
 /prompton score
+/prompton score "rough prompt"
 ```
 
 ### Coach
@@ -165,6 +173,7 @@ Inline annotations on weak spots. The model inserts `[category: suggestion]` bra
 
 ```
 /prompton coach
+/prompton coach "rough prompt"
 ```
 
 Annotation categories: `vague`, `missing-context`, `unbounded`, `no-verification`, `missing-constraint`, `ambiguous`.
@@ -183,12 +192,14 @@ If local lint finds no issues, Clarify is skipped entirely. Press `Esc` to cance
 
 ### Templates
 
-When the editor is empty, both `/prompton` and the shortcut (`Alt+P`) open the same template picker. Choose **"Blank prompt"** as the first option for free-form input with no scaffolding.
+When the editor is empty, both `/prompton` and the shortcut (`Alt+P`) open the same template picker.
 
 ```
-/prompton template        pick a prompt skeleton (includes blank option)
+/prompton template        pick a prompt skeleton
 /prompton input           clear editor, ready for free-form prompt
 ```
+
+Inline drafts can be wrapped in double quotes, single quotes, or backticks for `/prompton`, `/prompton coach`, `/prompton lint`, and `/prompton score`. The opener closes Pi's slash-command dropdown, so the wrapped text is treated as prompt content instead of a command option.
 
 ### History
 

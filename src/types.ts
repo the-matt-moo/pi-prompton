@@ -149,6 +149,7 @@ export interface PromptonRuntimeSupport {
 export interface ParsedPromptonCommand {
   name: string;
   args: string[];
+  inlineDraft?: string;
 }
 
 export interface BuildPromptContextOptions {

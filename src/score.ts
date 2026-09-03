@@ -4,7 +4,11 @@
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { runEnhancerTextTask, type ModelTaskServices } from "./model-task.js";
-import { buildSentinelReminder, parseEnhancedPrompt } from "./parser.js";
+import {
+  buildSentinelReminder,
+  isInvalidModelOutputError,
+  parseEnhancedPrompt,
+} from "./parser.js";
 import type { PromptonRuntimeState } from "./state.js";
 
 export interface ScoreResult {
@@ -37,24 +41,50 @@ export async function scoreDraft(
   runtime: PromptonRuntimeState,
   services: ModelTaskServices
 ): Promise<ScoreResult | undefined> {
-  const text = await runEnhancerTextTask(ctx, runtime, services, {
+  const userText = `Rate this prompt draft:\n\n${draft}`;
+  const primaryText = await runEnhancerTextTask(ctx, runtime, services, {
     label: "Prompton scoring draft...",
     systemPrompt: SCORE_SYSTEM_PROMPT,
-    userText: `Rate this prompt draft:\n\n${draft}`,
+    userText,
     maxTokens: 300,
   });
-  return text === undefined ? undefined : parseScoreResponse(text);
+  if (primaryText === undefined) {
+    return undefined;
+  }
+
+  try {
+    return parseScoreBody(primaryText);
+  } catch (error) {
+    if (!isInvalidModelOutputError(error)) {
+      throw error;
+    }
+
+    const retryText = await runEnhancerTextTask(ctx, runtime, services, {
+      label: "Prompton scoring draft...",
+      systemPrompt: `${SCORE_SYSTEM_PROMPT}\n\nIMPORTANT: Return exactly one sentinel block and no surrounding commentary.`,
+      userText: `${userText}\n\nIMPORTANT: Return exactly one sentinel block and no surrounding commentary.`,
+      maxTokens: 300,
+    });
+    if (retryText === undefined) {
+      return undefined;
+    }
+
+    return parseScoreResponse(retryText);
+  }
 }
 
 export function parseScoreResponse(text: string): ScoreResult {
-  let body: string;
   try {
-    body = parseEnhancedPrompt(text);
+    return parseScoreBody(text);
   } catch (error) {
     throw new Error(
       `Invalid score response: ${error instanceof Error ? error.message : String(error)}`
     );
   }
+}
+
+function parseScoreBody(text: string): ScoreResult {
+  const body = parseEnhancedPrompt(text);
   const scoreMatch = body.match(/Score:\s*([1-5])\s*\/\s*5/i);
   const weaknessMatch = body.match(/Weaknesses:\s*([\s\S]*?)(?:Summary:|$)/i);
   const summaryMatch = body.match(/Summary:\s*(.+)/i);

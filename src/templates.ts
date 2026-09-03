@@ -13,12 +13,6 @@ interface PromptTemplate {
 
 const TEMPLATES: PromptTemplate[] = [
   {
-    value: "blank",
-    label: "Blank prompt",
-    description: "Free-form prompt, no template",
-    skeleton: "",
-  },
-  {
     value: "implement",
     label: "Implement feature",
     description: "Add or build something new",
@@ -80,7 +74,7 @@ export async function pickTemplate(ctx: ExtensionContext): Promise<string | unde
       label: t.label,
       description: t.description,
     })),
-    pageSize: 4,
+    pageSize: 6,
   });
 
   if (!choice) return undefined;

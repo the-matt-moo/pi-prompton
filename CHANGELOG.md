@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.3]
+
+### Features
+
+* **prompton:** support inline draft input for `/prompton`, `/prompton coach`, `/prompton lint`, and `/prompton score` when wrapped in quotes
+* **prompton:** accept double quotes, single quotes, or backticks for wrapped inline drafts
+* **readme:** document inline prompt usage and quote-wrapped slash-command input
+
+### Bug Fixes
+
+* **prompton:** retry `score` once when the model omits the sentinel block
+
 ## [0.5.2]
 
 ### Features

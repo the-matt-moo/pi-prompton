@@ -28,6 +28,56 @@ void test("parsePromptonCommand splits command name and args", () => {
   assert.deepEqual(parsePromptonCommand("  "), { name: "", args: [] });
 });
 
+void test("parsePromptonCommand extracts inline draft from wrapped syntax", () => {
+  assert.deepEqual(parsePromptonCommand('"are there usability friction points to optimize"'), {
+    name: "",
+    args: [],
+    inlineDraft: "are there usability friction points to optimize",
+  });
+  assert.deepEqual(parsePromptonCommand("'are there usability friction points to optimize'"), {
+    name: "",
+    args: [],
+    inlineDraft: "are there usability friction points to optimize",
+  });
+  assert.deepEqual(parsePromptonCommand("`are there usability friction points to optimize`"), {
+    name: "",
+    args: [],
+    inlineDraft: "are there usability friction points to optimize",
+  });
+  assert.deepEqual(parsePromptonCommand('coach "fix the auth bug"'), {
+    name: "coach",
+    args: [],
+    inlineDraft: "fix the auth bug",
+  });
+  assert.deepEqual(parsePromptonCommand("coach 'fix the auth bug'"), {
+    name: "coach",
+    args: [],
+    inlineDraft: "fix the auth bug",
+  });
+  assert.deepEqual(parsePromptonCommand("coach `fix the auth bug`"), {
+    name: "coach",
+    args: [],
+    inlineDraft: "fix the auth bug",
+  });
+  assert.deepEqual(parsePromptonCommand("coach fix the auth bug"), {
+    name: "coach",
+    args: ["fix", "the", "auth", "bug"],
+  });
+  assert.deepEqual(parsePromptonCommand('score "are there usability friction points"'), {
+    name: "score",
+    args: [],
+    inlineDraft: "are there usability friction points",
+  });
+  assert.deepEqual(parsePromptonCommand("clarify on"), {
+    name: "clarify",
+    args: ["on"],
+  });
+  assert.deepEqual(parsePromptonCommand("family auto"), {
+    name: "family",
+    args: ["auto"],
+  });
+});
+
 void test("argument completions expose commands and common values", () => {
   assert.deepEqual(getPromptonArgumentCompletions("reset-s"), [
     { value: "reset-settings", label: "reset-settings" },
