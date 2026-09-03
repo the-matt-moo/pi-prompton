@@ -5,6 +5,7 @@ import {
   handlePromptonCommand,
   parsePromptonCommand,
 } from "../src/commands.js";
+import { HELP_LINES } from "../src/constants.js";
 import { handlePromptonShortcut } from "../src/shortcut.js";
 import { openSettingsUi } from "../src/ui/settings.js";
 import {
@@ -38,6 +39,16 @@ void test("argument completions expose commands and common values", () => {
   assert.deepEqual(getPromptonArgumentCompletions("mode e"), [
     { value: "mode execution-contract", label: "mode execution-contract" },
   ]);
+});
+
+void test("help entries include short descriptions", () => {
+  assert.match(HELP_LINES, /\/prompton status — show config and runtime state/);
+  assert.match(HELP_LINES, /\/prompton help — show this list/);
+  assert.match(HELP_LINES, /\/prompton enhancer-model active — use the active model/);
+  assert.match(HELP_LINES, /\/prompton enhancer-model fixed/);
+  // family-linked and map are intentionally hidden from short help
+  assert.doesNotMatch(HELP_LINES, /family-linked/);
+  assert.doesNotMatch(HELP_LINES, /map active/);
 });
 
 void test("prompton command enhances the current editor draft", async () => {
