@@ -169,18 +169,17 @@ export async function handlePromptonCommand(
         handleTimeoutCommand(command, ctx, runtime, services);
         return;
       case "clarify":
-        if (command.args.length > 0) {
-          handleBooleanSettingCommand(
-            command,
-            ctx,
-            runtime,
-            services,
-            "clarifyEnabled",
-            "Clarify setting updated."
-          );
-        } else {
-          await runClarifyCommand(ctx, runtime);
-        }
+        await runClarifyCommand(ctx, runtime);
+        return;
+      case "auto-clarify":
+        handleBooleanSettingCommand(
+          command,
+          ctx,
+          runtime,
+          services,
+          "clarifyEnabled",
+          "Auto-clarify setting updated."
+        );
         return;
       case "clarify-on-shortcut":
         handleBooleanSettingCommand(
@@ -231,7 +230,7 @@ export function parsePromptonCommand(rawArgs: string): ParsedPromptonCommand {
     return { name: "", args: [], inlineDraft: bareInline[2] };
   }
 
-  const quotedCommand = trimmed.match(/^(coach|lint|score)\s+(["'`])(.+)\2$/i);
+  const quotedCommand = trimmed.match(/^(coach|lint|score|clarify)\s+(["'`])(.+)\2$/i);
   if (quotedCommand?.[1] && quotedCommand[3]) {
     return {
       name: quotedCommand[1].toLowerCase(),
@@ -271,6 +270,7 @@ export function getPromptonArgumentCompletions(
     "preserve-code",
     "timeout",
     "clarify",
+    "auto-clarify",
     "clarify-on-shortcut",
     "lint",
     "score",
@@ -293,7 +293,7 @@ export function getPromptonArgumentCompletions(
     "auto-send": ["on", "off"],
     "auto-send-when-busy": ["steer", "follow-up"],
     "preserve-code": ["on", "off"],
-    clarify: ["on", "off"],
+    "auto-clarify": ["on", "off"],
     "clarify-on-shortcut": ["on", "off"],
   };
   const [command] = loweredPrefix.trimStart().split(/\s+/, 1);

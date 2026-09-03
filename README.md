@@ -23,7 +23,7 @@ Two output styles:
 | **Command Prefix**         | `/promptsmith`                          | `/prompton`                                                                        |
 | **Settings File**          | `~/.pi/agent/promptsmith-settings.json` | `~/.pi/agent/prompton-settings.json` (auto-migrates legacy settings)               |
 | **LLM Prompt Strategy**    | Dual-strategy (`gpt.ts` & `claude.ts`)  | Unified strategy (`unified.ts`) with target-family awareness                       |
-| **Prompt Coaching Suite**  | None                                    | `/prompton lint`, `score`, `coach`, `clarify`, `template`, `history`               |
+| **Prompt Coaching Suite**  | None                                    | `/prompton lint`, `score`, `coach`, `clarify`, `template`, `history` + `auto-clarify` toggle |
 | **Clarify Mode**           | None                                    | Single-dialog lint + intent clarification before enhancement                       |
 | **Prompt Linting**         | None                                    | Local instant linting (`/prompton lint`) for missing verbs, scope, subjects        |
 | **Prompt Quality Scoring** | None                                    | LLM-based 1–5 score with top 3 weaknesses (`/prompton score`)                      |
@@ -32,7 +32,7 @@ Two output styles:
 | **Empty Editor Action**    | Opens settings dialog                   | Opens template picker dialog (both command & shortcut)                             |
 | **Draft History / Undo**   | Single-entry undo (`/promptsmith undo`) | 10-entry ring buffer history (`/prompton history`) + `/prompton undo`              |
 | **Token Estimation**       | None                                    | Token estimate (`~N tokens`) in enhancement notifications                          |
-| **CLI Auto-Completions**   | Subcommands only                        | Subcommands + value completions (`clarify on/off`, `family auto/gpt/claude`, etc.) |
+| **CLI Auto-Completions**   | Subcommands only                        | Subcommands + value completions (`auto-clarify on/off`, `family auto/gpt/claude`, etc.) |
 | **Settings Migration**     | N/A                                     | Backward-compatible fallback for legacy `promptsmith-settings.json`                |
 
 ## Installation
@@ -57,15 +57,25 @@ pi install git:github.com/the-matt-moo/pi-prompton
 
 ## Quick start
 
-Write a rough request in the Pi editor, then press `Alt+P` (default) or run `/prompton`.
+**In the editor:**
+1. Type a rough prompt in the Pi editor.
+2. Press **`Alt+P`** (keyboard shortcut) to enhance the draft.
 
-Inline input also works when wrapped in quotes:
+**Inline (one-off commands with quoted prompts):**
+```bash
+/prompton lint "rough prompt"      # lint inline draft
+/prompton coach 'rough prompt'     # coach inline draft
+/prompton score &#96;rough prompt&#96;   # score inline draft
+/prompton clarify "rough prompt"   # clarify inline draft
+```
 
-- `/prompton "rough prompt"`
-- `/prompton coach 'rough prompt'`
-- `/prompton score &#96;rough prompt&#96;`
+**⚠️ Important:** Do not type `/prompton lint` (or other commands) *bare* in the editor body — they will be sent to the LLM as part of your prompt. Use either:
+- **Editor + Alt+P** (keyboard shortcut on current draft)
+- **`/prompton <command> "quoted prompt"`** (inline command with quoted prompt)
 
-To undo: `/prompton undo`
+### Undo
+
+To revert to the previous draft: `/prompton undo` or use Pi's undo (Ctrl+Z).
 
 ## Rewrite modes
 
@@ -184,7 +194,7 @@ A single dialog shown only when local lint finds missing information. Choose one
 
 ```
 /prompton clarify                  run clarify on the current draft (one-shot)
-/prompton clarify on|off           enable/disable clarify before every enhancement
+/prompton auto-clarify on|off      enable/disable clarify before every enhancement
 /prompton clarify-on-shortcut on|off   also clarify on keyboard shortcut
 ```
 
@@ -225,7 +235,7 @@ After every enhancement, the success notification includes an approximate token 
 /prompton score              LLM-based quality rating (1-5)
 /prompton coach              inline annotations on weak spots
 /prompton clarify            single-step clarification dialog
-/prompton clarify on|off     toggle clarify before enhancement
+/prompton auto-clarify on|off     toggle clarify before enhancement
 /prompton clarify-on-shortcut on|off   toggle clarify on shortcut
 /prompton template           pick a prompt skeleton
 /prompton input              clear editor for free-form prompt entry
