@@ -69,6 +69,35 @@ function resolveBuiltinFamily(provider: string, id: string): ResolvedTargetFamil
     return { family: "claude", source: "builtin", matchedRule: "anthropic|moonshot|claude*|kimi*" };
   }
 
+  // antigravity routes to both Claude and Gemini — claude* already caught above.
+  if (
+    (provider === "antigravity" && id.startsWith("gemini")) ||
+    (provider === "google" && id.startsWith("gemini"))
+  ) {
+    return { family: "gpt", source: "builtin", matchedRule: "gemini → gpt" };
+  }
+
+  if (
+    provider === "openrouter" &&
+    (id.startsWith("deepseek") || id.startsWith("~deepseek"))
+  ) {
+    return { family: "gpt", source: "builtin", matchedRule: "openrouter/deepseek → gpt" };
+  }
+
+  if (provider === "deepseek") {
+    return { family: "gpt", source: "builtin", matchedRule: "deepseek → gpt" };
+  }
+
+  if (
+    provider === "openrouter" &&
+    (id.startsWith("nvidia") ||
+      id.startsWith("minimax") ||
+      id.startsWith("z-ai") ||
+      id === "openrouter/free")
+  ) {
+    return { family: "gpt", source: "builtin", matchedRule: "openrouter/misc → gpt" };
+  }
+
   return undefined;
 }
 
