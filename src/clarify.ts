@@ -1,11 +1,14 @@
 /**
- * Single-dialog clarifier — shows lint warnings + intent-based suggestions
- * in one select dialog. User picks what to append, done in one interaction.
+ * Single-dialog clarifier — uses Jev speculative fan-out (needsClarification noul +
+ * missingContext choice from detectTaskIntentSmart) instead of brittle regex linting.
+ * Falls back to regex lintDraft when Jev is unavailable (source "regex").
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { detectTaskIntentSmart } from "./jev-intent.js";
 import { lintDraft } from "./lint.js";
 import { openSelectDialog, type SelectDialogItem } from "./ui/select-dialog.js";
+
+import type { JevIntentOptions } from "./jev-intent.js";
 
 /**
  * Show a single clarification dialog based on the draft's lint issues and intent.
@@ -13,11 +16,28 @@ import { openSelectDialog, type SelectDialogItem } from "./ui/select-dialog.js";
  */
 export async function clarifyDraft(
   ctx: ExtensionContext,
-  draft: string
+  draft: string,
+  options: JevIntentOptions = {}
 ): Promise<string | undefined> {
-  const { intent } = await detectTaskIntentSmart(draft);
-  const warnings = lintDraft(draft);
+  const result = await detectTaskIntentSmart(draft, options);
+  const { intent } = result;
 
+  // Jev available: use speculative fan-out fields to decide if clarification needed
+  if (result.source === "jev" && result.needsClarification !== undefined) {
+    const clarifyProb = result.needsClarification;
+    if (clarifyProb < 0.5) {
+      return draft; // Confident prompt, skip dialog
+    }
+    const items = missingContextItems(result.missingContext);
+    for (const suggestion of getIntentSuggestions(intent)) {
+      if (items.length >= 4) break;
+      items.push(suggestion);
+    }
+    return showClarificationDialog(ctx, draft, items);
+  }
+
+  // Fallback: regex linting when Jev not available
+  const warnings = lintDraft(draft);
   if (warnings.length === 0) {
     return draft;
   }
@@ -27,12 +47,19 @@ export async function clarifyDraft(
     const fix = lintFix(warning.id);
     if (fix) items.push(fix);
   }
-
   for (const suggestion of getIntentSuggestions(intent)) {
-    if (items.length >= 3) break;
+    if (items.length >= 4) break;
     items.push(suggestion);
   }
+  return showClarificationDialog(ctx, draft, items);
+}
 
+async function showClarificationDialog(
+  ctx: ExtensionContext,
+  draft: string,
+  items: SelectDialogItem[],
+): Promise<string | undefined> {
+  if (items.length === 0) return draft;
   items.push({ value: "__custom__", label: "Type something" });
 
   const choice = await openSelectDialog(ctx, {
@@ -50,6 +77,39 @@ export async function clarifyDraft(
       : undefined;
   const clarification = inputPrompt ? await ctx.ui.input(inputPrompt) : choice;
   return clarification?.trim() ? `${draft}\n\n${clarification.trim()}` : undefined;
+}
+
+function missingContextItems(
+  missing: "files" | "repro" | "acceptance" | "scope" | undefined
+): SelectDialogItem[] {
+  switch (missing) {
+    case "files":
+      return [{
+        value: "__input__:Which file or directory?",
+        label: "Name the target",
+        description: "Task needs file or module paths",
+      }];
+    case "repro":
+      return [{
+        value: "__input__:What error or output do you see?",
+        label: "Add reproduction",
+        description: "Task needs error output or steps",
+      }];
+    case "acceptance":
+      return [{
+        value: "__input__:What should the result look like?",
+        label: "Define outcome",
+        description: "Task needs expected behavior",
+      }];
+    case "scope":
+      return [{
+        value: "__input__:Which files or modules are in scope?",
+        label: "Narrow scope",
+        description: "Task needs scope boundaries",
+      }];
+    default:
+      return [];
+  }
 }
 
 function lintFix(warningId: string): SelectDialogItem | undefined {

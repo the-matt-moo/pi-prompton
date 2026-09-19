@@ -2,6 +2,7 @@
  * Jev Choice–based intent classification.
  * Replaces regex keyword matching with semantic classification via TypeSafe System One.
  * Falls back to regex `detectTaskIntent` on error or missing API key.
+ * Speculative fan-out: asks intent + clarification needs in one call with zero added latency.
  */
 
 import type { PromptonTaskIntent } from "./types.js";
@@ -57,6 +58,10 @@ export interface JevIntentResult {
   intent: PromptonTaskIntent;
   source: "jev" | "regex";
   confidence?: number | undefined;
+  /** Jev Noul probability that prompt is too vague/ambiguous (0-1). Only set when source is "jev". */
+  needsClarification?: number | undefined;
+  /** Most critically missing context element. Only set when source is "jev" and not "none". */
+  missingContext?: "files" | "repro" | "acceptance" | "scope" | undefined;
 }
 
 /**
@@ -112,6 +117,23 @@ async function classifyWithJev(
           "Classify the user's coding-agent prompt draft into the single best-fitting task intent category.",
         criteria: INTENT_CRITERIA,
       },
+      needsClarification: {
+        type: "noul" as const,
+        instructions:
+          "The prompt is too vague, ambiguous, or lacks essential context (files, error output, acceptance criteria) to execute immediately.",
+      },
+      missingContext: {
+        type: "choice" as const,
+        instructions:
+          "Which element is most critically missing from the prompt?",
+        criteria: {
+          none: "Prompt has sufficient context to proceed",
+          files: "Missing file paths or target locations",
+          repro: "Missing error output, stack traces, or reproduction steps",
+          acceptance: "Missing desired behavior, expected outcome, or acceptance criteria",
+          scope: "Missing scope boundaries (single file? all files? specific module?)",
+        },
+      },
     },
   };
 
@@ -130,6 +152,8 @@ async function classifyWithJev(
   const data = (await response.json()) as {
     answers?: {
       intent?: { choice?: string; confidence?: number };
+      needsClarification?: { noul?: number };
+      missingContext?: { choice?: string; confidence?: number };
     };
   };
 
@@ -143,10 +167,21 @@ async function classifyWithJev(
     return undefined; // Low confidence → fall back to regex
   }
 
+  const clarificationNoul = data.answers?.needsClarification?.noul;
+  const missingContext = data.answers?.missingContext?.choice as
+    | "none"
+    | "files"
+    | "repro"
+    | "acceptance"
+    | "scope"
+    | undefined;
+
   return {
     intent,
     source: "jev" as const,
     ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
+    ...(clarificationNoul !== undefined ? { needsClarification: clarificationNoul } : {}),
+    ...(missingContext && missingContext !== "none" ? { missingContext } : {}),
   };
 }
 
