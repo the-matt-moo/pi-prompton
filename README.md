@@ -91,7 +91,7 @@ Configured in `~/.pi/agent/prompton-settings.json`.
 
 ### `auto` (default)
 
-Uses local heuristics to pick the output style. Chooses **execution-contract** for coding tasks (implement, debug, refactor, review, research, docs, tests). Chooses **plain** for explanations, brainstorming, prose cleanup, and open-ended chat.
+Uses TypeSafe Jev Choice to classify the draft when the shared `pi-bifrost/jev-api-key` Windows Credential Manager entry is available, then picks the output style. It falls back to local heuristics when Jev is unavailable or uncertain. It chooses **execution-contract** for coding tasks (implement, debug, refactor, review, research, docs, tests), and **plain** for explanations, brainstorming, prose cleanup, and open-ended chat.
 
 ### `plain`
 
@@ -307,7 +307,7 @@ Stored at `~/.pi/agent/prompton-settings.json`. On first use after upgrading fro
 
 ## Context
 
-Always included: current editor draft, rewrite mode, target-family routing, local intent detection.
+Always included: current editor draft, rewrite mode, target-family routing, and intent detection. Intent detection uses Jev when available and falls back to local heuristics.
 
 Optional (off by default):
 
@@ -340,7 +340,7 @@ Enhancer model modes: `active`, `fixed`, `family-linked`.
 - GPT calls request concise output where the provider supports verbosity controls
 - Collapsed Pi paste markers recovered from clipboard where possible; multi-marker drafts fail closed
 - Oversized drafts fail clearly instead of silent truncation
-- Intent detection is local and deterministic — no second model call
+- Intent detection uses Jev when configured, with deterministic local fallback and no added enhancement model call
 
 ## Runtime support
 

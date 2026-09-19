@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0]
+
+### Features
+
+* **prompton:** use TypeSafe Jev Choice for semantic intent classification when the shared credential is available
+* **prompton:** fall back to deterministic local intent detection when Jev is unavailable or uncertain
+
 ## [0.5.3]
 
 ### Features

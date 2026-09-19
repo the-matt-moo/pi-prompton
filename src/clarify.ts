@@ -3,7 +3,7 @@
  * in one select dialog. User picks what to append, done in one interaction.
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { detectTaskIntent } from "./intent.js";
+import { detectTaskIntentSmart } from "./jev-intent.js";
 import { lintDraft } from "./lint.js";
 import { openSelectDialog, type SelectDialogItem } from "./ui/select-dialog.js";
 
@@ -15,7 +15,7 @@ export async function clarifyDraft(
   ctx: ExtensionContext,
   draft: string
 ): Promise<string | undefined> {
-  const intent = detectTaskIntent(draft);
+  const { intent } = await detectTaskIntentSmart(draft);
   const warnings = lintDraft(draft);
 
   if (warnings.length === 0) {

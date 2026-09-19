@@ -8,7 +8,8 @@ import {
   MAX_PROJECT_METADATA_TOKENS,
   MAX_RECENT_CONVERSATION_TOKENS,
 } from "./constants.js";
-import { analyzeDraftIntent } from "./intent.js";
+import { resolveEffectiveRewriteMode } from "./intent.js";
+import { detectTaskIntentSmart } from "./jev-intent.js";
 import type {
   BuildPromptContextOptions,
   ConversationExcerpt,
@@ -29,7 +30,11 @@ export async function buildPromptContext(
     );
   }
 
-  const draftAnalysis = analyzeDraftIntent(draft, settings.rewriteMode);
+  const jevResult = await detectTaskIntentSmart(draft);
+  const draftAnalysis = {
+    intent: jevResult.intent,
+    effectiveRewriteMode: resolveEffectiveRewriteMode(settings.rewriteMode, jevResult.intent),
+  };
   let remainingOptionalBudget =
     safeInputBudget - draftTokens - ESTIMATED_FIXED_PROMPT_OVERHEAD_TOKENS;
   const droppedContext: string[] = [];
