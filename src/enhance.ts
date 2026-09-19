@@ -378,6 +378,19 @@ async function runCompletion(
     return null;
   }
 
+  if (response.stopReason === "length" && extractTextResponse(response) === "") {
+    throw new Error(
+      `Prompton enhancer model ${preparation.enhancerModel.label} ran out of output tokens before producing a response (likely spent on reasoning). Try /prompton status or pick a less reasoning-heavy model.`
+    );
+  }
+
+  if (response.stopReason === "error") {
+    throw new Error(
+      response.errorMessage ??
+        `Prompton enhancer model ${preparation.enhancerModel.label} failed without an error message.`
+    );
+  }
+
   return response;
 }
 
@@ -387,12 +400,15 @@ function buildCompletionOptions(
 ): CompleteOptions {
   const { apiKey, headers } = preparation.enhancerModel.requestAuth;
 
+  const model = preparation.enhancerModel.model;
+
   return {
     ...(typeof apiKey === "string" ? { apiKey } : {}),
     ...(headers ? { headers } : {}),
-    ...buildGptCompletionOptions(preparation.enhancerModel.model),
+    ...buildGptCompletionOptions(model),
+    ...buildReasoningCompletionOptions(model),
     signal: requestSignal,
-    maxTokens: Math.min(preparation.enhancerModel.model.maxTokens, ENHANCER_MAX_OUTPUT_TOKENS),
+    maxTokens: Math.min(model.maxTokens, buildOutputTokenBudget(model)),
   };
 }
 
@@ -402,6 +418,22 @@ function buildGptCompletionOptions(model: Model<Api>): CompleteOptions {
   }
 
   return model.api === "openai-codex-responses" ? { textVerbosity: "low" } : {};
+}
+
+function buildReasoningCompletionOptions(model: Model<Api>): CompleteOptions {
+  if (!model.reasoning) return {};
+  if (model.api === "antigravity-api") return { reasoning: "low" };
+  if (model.api === "google-generative-ai" || model.api === "google-vertex") {
+    return { thinking: { enabled: true, level: "LOW" } };
+  }
+  return {};
+}
+
+function buildOutputTokenBudget(model: Model<Api>): number {
+  // Antigravity maps low reasoning for Gemini 3.1 Pro to a 1,001-token budget.
+  return model.api === "antigravity-api" && model.id.startsWith("gemini-3.1-pro")
+    ? ENHANCER_MAX_OUTPUT_TOKENS + 1_001
+    : ENHANCER_MAX_OUTPUT_TOKENS;
 }
 
 function isGptModel(model: Model<Api>): boolean {

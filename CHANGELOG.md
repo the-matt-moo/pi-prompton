@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1]
+
+### Bug Fixes
+
+* **prompton:** raise enhancer output budget for Antigravity Gemini 3.1 Pro low reasoning instead of truncating at the 1,001-token reasoning reservation
+* **prompton:** report empty truncated enhancer output as token exhaustion with model diagnostics instead of silently retrying
+* **prompton:** surface enhancer stop-reason errors with the provider error message when present
+
 ## [0.6.0]
 
 ### Features

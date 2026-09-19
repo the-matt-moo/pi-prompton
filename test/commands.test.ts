@@ -698,6 +698,55 @@ void test("invalid model output errors include model-specific diagnostics", asyn
   assert.match(message, /try \/prompton status/i);
 });
 
+void test("Antigravity Gemini enhancer reserves tokens for low reasoning", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const model = createModel({
+    api: "antigravity-api",
+    provider: "antigravity",
+    id: "gemini-3.1-pro",
+    reasoning: true,
+    maxTokens: 65_535,
+  });
+  const ctx = createCommandContext({ model, editorText: "original draft" });
+  let completionOptions: { reasoning?: unknown; maxTokens?: number } | undefined;
+
+  await handlePromptonCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, (_model, _context, options) => {
+      completionOptions = options;
+      return Promise.resolve(createCompleteResponse("enhanced draft"));
+    })
+  );
+
+  assert.equal(completionOptions?.reasoning, "low");
+  assert.equal(completionOptions?.maxTokens, 2_201);
+  assert.equal(ctx.uiState.editorText, "enhanced draft");
+});
+
+void test("empty truncated enhancer output reports token exhaustion without retrying", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel(), editorText: "original draft" });
+  let callCount = 0;
+
+  await handlePromptonCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => {
+      callCount += 1;
+      return Promise.resolve({ ...createAssistantResponse(""), stopReason: "length" });
+    })
+  );
+
+  assert.equal(callCount, 1);
+  assert.equal(ctx.uiState.editorText, "original draft");
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /ran out of output tokens/i);
+});
+
 void test("hung enhancement times out and leaves the editor unchanged", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
