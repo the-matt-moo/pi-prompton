@@ -11,11 +11,24 @@ import {
   createRuntimeState,
 } from "./helpers.js";
 
+function mockJevResult(intent = "implement", needsClarification = 0.1, missingContext = "none"): any {
+  return {
+    readCredential: () => Promise.resolve("fake-key"),
+    fetch: () => Promise.resolve(new Response(JSON.stringify({
+      answers: {
+        intent: { choice: intent, confidence: 0.9 },
+        needsClarification: { noul: needsClarification },
+        missingContext: { choice: missingContext }
+      }
+    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+  };
+}
+
 void test("clarify skips the dialog for a complete draft", async () => {
   const draft = "Implement authentication in src/auth.ts and verify with existing tests.";
   const ctx = createCommandContext({ editorText: draft });
 
-  assert.equal(await clarifyDraft(ctx, draft), draft);
+  assert.equal(await clarifyDraft(ctx, draft, mockJevResult("implement", 0.1, "none")), draft);
   assert.deepEqual(ctx.uiState.customTitles, []);
 });
 
@@ -27,7 +40,7 @@ void test("clarify accepts custom text from the fourth option", async () => {
   });
 
   assert.equal(
-    await clarifyDraft(ctx, "fix it"),
+    await clarifyDraft(ctx, "fix it", mockJevResult("debug", 0.9, "files")),
     "fix it\n\nOnly modify src/auth.ts and add a regression test."
   );
   assert.equal(ctx.uiState.customOptionsHistory[0]?.at(-1), "Type something");
