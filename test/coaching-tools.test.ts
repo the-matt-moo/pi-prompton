@@ -10,17 +10,28 @@ import {
   createModel,
   createRuntimeState,
 } from "./helpers.js";
+import type { JevIntentOptions } from "../src/jev-intent.js";
 
-function mockJevResult(intent = "implement", needsClarification = 0.1, missingContext = "none"): any {
+function mockJevResult(
+  intent = "implement",
+  needsClarification = 0.1,
+  missingContext = "none"
+): JevIntentOptions {
   return {
     readCredential: () => Promise.resolve("fake-key"),
-    fetch: () => Promise.resolve(new Response(JSON.stringify({
-      answers: {
-        intent: { choice: intent, confidence: 0.9 },
-        needsClarification: { noul: needsClarification },
-        missingContext: { choice: missingContext }
-      }
-    }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    fetch: () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            answers: {
+              intent: { choice: intent, confidence: 0.9 },
+              needsClarification: { noul: needsClarification },
+              missingContext: { choice: missingContext },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      ),
   };
 }
 
@@ -73,15 +84,25 @@ void test("score retries once when the model omits the sentinel block", async ()
   const runtime = createRuntimeState();
   const ctx = createCommandContext({ model: createModel() });
   const responses = [
-    createAssistantResponse("Score: 4/5\nWeaknesses:\n- Missing verification\nSummary: Strong draft."),
-    createCompleteResponse("Score: 4/5\nWeaknesses:\n- Missing verification\nSummary: Strong draft."),
+    createAssistantResponse(
+      "Score: 4/5\nWeaknesses:\n- Missing verification\nSummary: Strong draft."
+    ),
+    createCompleteResponse(
+      "Score: 4/5\nWeaknesses:\n- Missing verification\nSummary: Strong draft."
+    ),
   ];
   let calls = 0;
 
   const services = {
+    // eslint-disable-next-line @typescript-eslint/require-await -- test stub returns synchronously resolvable responses
     completeFn: async () => {
       calls += 1;
-      return responses.shift() ?? createCompleteResponse("Score: 4/5\nWeaknesses:\n- Missing verification\nSummary: Strong draft.");
+      return (
+        responses.shift() ??
+        createCompleteResponse(
+          "Score: 4/5\nWeaknesses:\n- Missing verification\nSummary: Strong draft."
+        )
+      );
     },
     runCancellableTask: (
       _ctx: Parameters<typeof scoreDraft>[0],

@@ -57,7 +57,7 @@ export async function clarifyDraft(
 async function showClarificationDialog(
   ctx: ExtensionContext,
   draft: string,
-  items: SelectDialogItem[],
+  items: SelectDialogItem[]
 ): Promise<string | undefined> {
   if (items.length === 0) return draft;
   items.push({ value: "__custom__", label: "Type something" });
@@ -84,29 +84,37 @@ function missingContextItems(
 ): SelectDialogItem[] {
   switch (missing) {
     case "files":
-      return [{
-        value: "__input__:Which file or directory?",
-        label: "Name the target",
-        description: "Task needs file or module paths",
-      }];
+      return [
+        {
+          value: "__input__:Which file or directory?",
+          label: "Name the target",
+          description: "Task needs file or module paths",
+        },
+      ];
     case "repro":
-      return [{
-        value: "__input__:What error or output do you see?",
-        label: "Add reproduction",
-        description: "Task needs error output or steps",
-      }];
+      return [
+        {
+          value: "__input__:What error or output do you see?",
+          label: "Add reproduction",
+          description: "Task needs error output or steps",
+        },
+      ];
     case "acceptance":
-      return [{
-        value: "__input__:What should the result look like?",
-        label: "Define outcome",
-        description: "Task needs expected behavior",
-      }];
+      return [
+        {
+          value: "__input__:What should the result look like?",
+          label: "Define outcome",
+          description: "Task needs expected behavior",
+        },
+      ];
     case "scope":
-      return [{
-        value: "__input__:Which files or modules are in scope?",
-        label: "Narrow scope",
-        description: "Task needs scope boundaries",
-      }];
+      return [
+        {
+          value: "__input__:Which files or modules are in scope?",
+          label: "Narrow scope",
+          description: "Task needs scope boundaries",
+        },
+      ];
     default:
       return [];
   }

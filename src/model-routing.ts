@@ -77,10 +77,7 @@ function resolveBuiltinFamily(provider: string, id: string): ResolvedTargetFamil
     return { family: "gpt", source: "builtin", matchedRule: "gemini → gpt" };
   }
 
-  if (
-    provider === "openrouter" &&
-    (id.startsWith("deepseek") || id.startsWith("~deepseek"))
-  ) {
+  if (provider === "openrouter" && (id.startsWith("deepseek") || id.startsWith("~deepseek"))) {
     return { family: "gpt", source: "builtin", matchedRule: "openrouter/deepseek → gpt" };
   }
 
