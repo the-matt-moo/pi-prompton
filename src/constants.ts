@@ -43,6 +43,8 @@ export const DEFAULT_SETTINGS: PromptonSettings = {
   enhancementTimeoutMs: DEFAULT_ENHANCEMENT_TIMEOUT_MS,
   clarifyEnabled: false,
   clarifyOnShortcut: false,
+  jevScoringEnabled: false,
+  jevVerificationEnabled: false,
 };
 
 export const HELP_LINES = [

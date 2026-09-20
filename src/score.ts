@@ -4,11 +4,8 @@
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { runEnhancerTextTask, type ModelTaskServices } from "./model-task.js";
-import {
-  buildSentinelReminder,
-  isInvalidModelOutputError,
-  parseEnhancedPrompt,
-} from "./parser.js";
+import { buildSentinelReminder, isInvalidModelOutputError, parseEnhancedPrompt } from "./parser.js";
+import { scoreDraftWithJev, type JevScoreResult } from "./jev-score.js";
 import type { PromptonRuntimeState } from "./state.js";
 
 export interface ScoreResult {
@@ -42,18 +39,28 @@ export async function scoreDraft(
   services: ModelTaskServices
 ): Promise<ScoreResult | undefined> {
   const userText = `Rate this prompt draft:\n\n${draft}`;
-  const primaryText = await runEnhancerTextTask(ctx, runtime, services, {
-    label: "Prompton scoring draft...",
-    systemPrompt: SCORE_SYSTEM_PROMPT,
-    userText,
-    maxTokens: 300,
-  });
+  // Speculative fan-out: the enhancer's free-text rating and Jev's typed Score
+  // run in parallel. Jev's numeric score (when available) replaces the
+  // regex-parsed one below; the enhancer text is still the only source for
+  // weaknesses/summary, which are generated prose Jev cannot produce.
+  // Opt-in via settings.jevScoringEnabled: this calls an external service and
+  // must not silently activate because an unrelated tool's Jev credential
+  // happens to be present on the machine.
+  const [primaryText, jevScore] = await Promise.all([
+    runEnhancerTextTask(ctx, runtime, services, {
+      label: "Prompton scoring draft...",
+      systemPrompt: SCORE_SYSTEM_PROMPT,
+      userText,
+      maxTokens: 300,
+    }),
+    runtime.getSettings().jevScoringEnabled ? scoreDraftWithJev(draft) : Promise.resolve(undefined),
+  ]);
   if (primaryText === undefined) {
     return undefined;
   }
 
   try {
-    return parseScoreBody(primaryText);
+    return applyJevScore(parseScoreBody(primaryText), jevScore);
   } catch (error) {
     if (!isInvalidModelOutputError(error)) {
       throw error;
@@ -69,8 +76,12 @@ export async function scoreDraft(
       return undefined;
     }
 
-    return parseScoreResponse(retryText);
+    return applyJevScore(parseScoreResponse(retryText), jevScore);
   }
+}
+
+function applyJevScore(result: ScoreResult, jevScore: JevScoreResult | undefined): ScoreResult {
+  return jevScore ? { ...result, score: jevScore.score } : result;
 }
 
 export function parseScoreResponse(text: string): ScoreResult {

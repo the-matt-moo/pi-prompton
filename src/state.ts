@@ -166,6 +166,11 @@ export function sanitizeSettings(value: unknown): PromptonSettings | undefined {
     enhancementTimeoutMs: readEnhancementTimeoutMs(value.enhancementTimeoutMs),
     clarifyEnabled: readBoolean(value.clarifyEnabled, DEFAULT_SETTINGS.clarifyEnabled),
     clarifyOnShortcut: readBoolean(value.clarifyOnShortcut, DEFAULT_SETTINGS.clarifyOnShortcut),
+    jevScoringEnabled: readBoolean(value.jevScoringEnabled, DEFAULT_SETTINGS.jevScoringEnabled),
+    jevVerificationEnabled: readBoolean(
+      value.jevVerificationEnabled,
+      DEFAULT_SETTINGS.jevVerificationEnabled
+    ),
   };
 }
 

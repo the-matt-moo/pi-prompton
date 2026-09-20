@@ -4,7 +4,8 @@ export type InvalidModelOutputReason =
   | "missing-sentinel-block"
   | "multiple-sentinel-blocks"
   | "text-outside-sentinel-block"
-  | "empty-enhanced-prompt";
+  | "empty-enhanced-prompt"
+  | "intent-not-preserved";
 
 const INVALID_MODEL_OUTPUT_PREFIX = "Prompton received invalid model output";
 
@@ -68,6 +69,8 @@ export function describeInvalidModelOutputReason(reason: InvalidModelOutputReaso
       return "unexpected text outside the sentinel block";
     case "empty-enhanced-prompt":
       return "empty enhanced prompt";
+    case "intent-not-preserved":
+      return "the rewrite appears to drop or contradict the original draft's intent";
   }
 }
 

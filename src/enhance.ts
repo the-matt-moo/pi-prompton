@@ -22,9 +22,10 @@ import {
   buildSentinelReminder,
   describeInvalidModelOutputReason,
   isInvalidModelOutputError,
-  type PromptonInvalidModelOutputError,
+  PromptonInvalidModelOutputError,
   parseEnhancedPrompt,
 } from "./parser.js";
+import { verifyIntentPreserved } from "./jev-verify.js";
 import type { PromptonRuntimeState } from "./state.js";
 import { buildStrategyRequest } from "./strategies/unified.js";
 import type {
@@ -153,7 +154,8 @@ export async function enhanceEditorDraft(
           services.enhancementTimeoutMs ?? settings.enhancementTimeoutMs,
           tracker,
           settings.fallbackEnhancerModels ?? [],
-          ctx.modelRegistry
+          ctx.modelRegistry,
+          settings.jevVerificationEnabled
         )
     );
 
@@ -296,7 +298,8 @@ async function generateEnhancedPrompt(
   timeoutMs: number,
   tracker: EnhancementAttemptTracker,
   fallbackModelRefs: ModelRef[],
-  modelRegistry: ModelRegistry
+  modelRegistry: ModelRegistry,
+  verifyEnabled: boolean
 ): Promise<string | null> {
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
@@ -312,7 +315,8 @@ async function generateEnhancedPrompt(
       requestSignal,
       signal,
       timeoutController.signal,
-      timeoutMs
+      timeoutMs,
+      verifyEnabled
     );
     if (primary.outcome === "success") return primary.prompt;
     if (primary.outcome === "cancelled") return null;
@@ -331,7 +335,8 @@ async function generateEnhancedPrompt(
         requestSignal,
         signal,
         timeoutController.signal,
-        timeoutMs
+        timeoutMs,
+        verifyEnabled
       );
       if (retry.outcome === "success") {
         tracker.recoveredAfterRetry = true;
@@ -383,7 +388,8 @@ async function generateEnhancedPrompt(
         requestSignal,
         signal,
         timeoutController.signal,
-        timeoutMs
+        timeoutMs,
+        verifyEnabled
       );
       if (fallback.outcome === "success") {
         tracker.recoveredAfterFallback = true;
@@ -415,7 +421,8 @@ async function runParsedCompletion(
   requestSignal: AbortSignal,
   signal: AbortSignal,
   timeoutSignal: AbortSignal,
-  timeoutMs: number
+  timeoutMs: number,
+  verifyEnabled: boolean
 ): Promise<CompletionAttempt> {
   let response: AssistantMessage | null;
   try {
@@ -440,7 +447,22 @@ async function runParsedCompletion(
   if (response === null) return { outcome: "cancelled" };
   const text = extractTextResponse(response);
   try {
-    return { outcome: "success", prompt: parseEnhancedPrompt(text) };
+    const prompt = parseEnhancedPrompt(text);
+    // sde_cascade-style verify step: a structurally valid rewrite can still
+    // drop the user's intent. Opt-in via settings.jevVerificationEnabled;
+    // Jev unavailable/uncertain fails open (treated as preserved) since this
+    // is a quality gate, not a safety guardrail.
+    const preserved = verifyEnabled
+      ? await verifyIntentPreserved(preparation.promptContext.draft, prompt)
+      : true;
+    if (!preserved) {
+      return {
+        outcome: "invalid",
+        error: new PromptonInvalidModelOutputError("intent-not-preserved"),
+        text,
+      };
+    }
+    return { outcome: "success", prompt };
   } catch (error) {
     if (!isInvalidModelOutputError(error)) throw error;
     return { outcome: "invalid", error, text };

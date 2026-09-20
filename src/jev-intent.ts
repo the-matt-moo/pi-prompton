@@ -7,11 +7,8 @@
 
 import type { PromptonTaskIntent } from "./types.js";
 import { detectTaskIntent } from "./intent.js";
+import { callSystemOne, DEFAULT_MODEL, resolveJevApiKey } from "./jev-client.js";
 
-const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
-const DEFAULT_MODEL = "jev-latest";
-const DEFAULT_TIMEOUT_MS = 5_000;
-const DEFAULT_CREDENTIAL_TARGET = "pi-bifrost/jev-api-key";
 const DEFAULT_CONFIDENCE_THRESHOLD = 0.4;
 
 /**
@@ -78,11 +75,7 @@ export async function detectTaskIntentSmart(
   }
 
   try {
-    const apiKey =
-      options.apiKey ??
-      (await (options.readCredential ?? readWindowsCredential)(
-        options.credentialTarget ?? DEFAULT_CREDENTIAL_TARGET
-      ));
+    const apiKey = await resolveJevApiKey(options);
 
     if (!apiKey) {
       return { intent: detectTaskIntent(draft), source: "regex" };
@@ -102,9 +95,7 @@ async function classifyWithJev(
   apiKey: string,
   options: JevIntentOptions
 ): Promise<JevIntentResult | undefined> {
-  const fetchFn = options.fetch ?? globalThis.fetch;
   const model = options.model ?? DEFAULT_MODEL;
-  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const threshold = options.confidenceThreshold ?? DEFAULT_CONFIDENCE_THRESHOLD;
 
   const body = {
@@ -124,8 +115,7 @@ async function classifyWithJev(
       },
       missingContext: {
         type: "choice" as const,
-        instructions:
-          "Which element is most critically missing from the prompt?",
+        instructions: "Which element is most critically missing from the prompt?",
         criteria: {
           none: "Prompt has sufficient context to proceed",
           files: "Missing file paths or target locations",
@@ -137,25 +127,8 @@ async function classifyWithJev(
     },
   };
 
-  const response = await fetchFn(JEV_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-
-  if (!response.ok) return undefined;
-
-  const data = (await response.json()) as {
-    answers?: {
-      intent?: { choice?: string; confidence?: number };
-      needsClarification?: { noul?: number };
-      missingContext?: { choice?: string; confidence?: number };
-    };
-  };
+  const data = await callSystemOne(body, apiKey, options);
+  if (!data) return undefined;
 
   const answer = data.answers?.intent;
   if (!answer?.choice) return undefined;
@@ -183,104 +156,4 @@ async function classifyWithJev(
     ...(clarificationNoul !== undefined ? { needsClarification: clarificationNoul } : {}),
     ...(missingContext && missingContext !== "none" ? { missingContext } : {}),
   };
-}
-
-// ---------- Windows Credential Manager (inlined from bifrost pattern) ----------
-
-import { execFile } from "node:child_process";
-
-const CREDENTIAL_SCRIPT = String.raw`
-$source = @'
-using System;
-using System.Runtime.InteropServices;
-
-public static class PromptyCredential {
-  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-  private struct Credential {
-    public UInt32 Flags;
-    public UInt32 Type;
-    public IntPtr TargetName;
-    public IntPtr Comment;
-    public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
-    public UInt32 CredentialBlobSize;
-    public IntPtr CredentialBlob;
-    public UInt32 Persist;
-    public UInt32 AttributeCount;
-    public IntPtr Attributes;
-    public IntPtr TargetAlias;
-    public IntPtr UserName;
-  }
-
-  [DllImport("advapi32.dll", EntryPoint = "CredReadW", CharSet = CharSet.Unicode, SetLastError = true)]
-  private static extern bool CredRead(string target, UInt32 type, UInt32 reserved, out IntPtr credential);
-
-  [DllImport("advapi32.dll", SetLastError = true)]
-  private static extern void CredFree(IntPtr credential);
-
-  public static string Read(string target) {
-    IntPtr pointer;
-    if (!CredRead(target, 1, 0, out pointer)) {
-      if (Marshal.GetLastWin32Error() == 1168) return null;
-      throw new InvalidOperationException("Credential Manager read failed.");
-    }
-
-    try {
-      Credential credential = (Credential)Marshal.PtrToStructure(pointer, typeof(Credential));
-      return credential.CredentialBlobSize == 0
-        ? ""
-        : Marshal.PtrToStringUni(credential.CredentialBlob, (int)credential.CredentialBlobSize / 2);
-    }
-    finally {
-      CredFree(pointer);
-    }
-  }
-}
-'@
-Add-Type -TypeDefinition $source
-$value = [PromptyCredential]::Read($env:PROMPTON_CREDENTIAL_TARGET)
-if ($null -eq $value) { exit 3 }
-[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($value)))
-`;
-
-const encodedScript = Buffer.from(CREDENTIAL_SCRIPT, "utf16le").toString("base64");
-const credentialCache = new Map<string, string>();
-
-async function readWindowsCredential(target: string): Promise<string | undefined> {
-  if (process.platform !== "win32" || !target.trim()) return undefined;
-  const cached = credentialCache.get(target);
-  if (cached !== undefined) return cached;
-
-  const encoded = await new Promise<string | undefined>((resolve, reject) => {
-    execFile(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodedScript],
-      {
-        env: {
-          SystemRoot: process.env.SystemRoot,
-          WINDIR: process.env.WINDIR,
-          ComSpec: process.env.ComSpec,
-          TEMP: process.env.TEMP,
-          TMP: process.env.TMP,
-          PROMPTON_CREDENTIAL_TARGET: target,
-        },
-        windowsHide: true,
-        timeout: 5_000,
-        maxBuffer: 16 * 1024,
-        encoding: "utf8",
-      },
-      (error, stdout) => {
-        if (error) {
-          if ("code" in error && error.code === 3) resolve(undefined);
-          else reject(new Error(`Unable to read Windows credential "${target}".`));
-          return;
-        }
-        resolve(stdout.trim() || undefined);
-      }
-    );
-  });
-
-  if (!encoded) return undefined;
-  const value = Buffer.from(encoded, "base64").toString("utf8");
-  credentialCache.set(target, value);
-  return value;
 }

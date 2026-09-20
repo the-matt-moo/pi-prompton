@@ -63,6 +63,10 @@ export interface PromptonSettings {
   enhancementTimeoutMs: number;
   clarifyEnabled: boolean;
   clarifyOnShortcut: boolean;
+  /** Use Jev's typed Score for the /prompton score rating when available. Default: false. */
+  jevScoringEnabled: boolean;
+  /** Verify enhanced rewrites preserve draft intent via Jev before accepting them. Default: false. */
+  jevVerificationEnabled: boolean;
 }
 
 export interface ResolvedTargetFamily {

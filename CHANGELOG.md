@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0]
+
+### Features
+
+* **prompton:** add opt-in Jev Score judgment for `/prompton score`, replacing the regex-parsed rating when `jevScoringEnabled` is set
+* **prompton:** add opt-in Jev verification that flags enhanced rewrites which drop or contradict the original draft's intent when `jevVerificationEnabled` is set, reusing the existing retry/fallback pipeline
+* **prompton:** extract a shared TypeSafe credential/transport client, deduplicating the Windows Credential Manager reader previously inlined in intent detection
+
 ## [0.7.0]
 
 ### Features

@@ -343,6 +343,8 @@ Enhancer model modes: `active`, `fixed`, `family-linked`. Optional fallback mode
 - Collapsed Pi paste markers recovered from clipboard where possible; multi-marker drafts fail closed
 - Oversized drafts fail clearly instead of silent truncation
 - Intent detection uses Jev when configured, with deterministic local fallback and no added enhancement model call
+- `jevScoringEnabled` (default off): score command uses Jev's typed Score judgment for the 1-5 rating, falling back to the enhancer model's own parsed rating when unset, unconfigured, or unavailable
+- `jevVerificationEnabled` (default off): enhanced rewrites are checked with Jev for dropped/contradicted intent before acceptance; unavailable or uncertain Jev fails open (never blocks a structurally valid rewrite). Both are opt-in since they call an external service and must not activate just because an unrelated tool's Jev credential exists on the machine
 
 ## Runtime support
 
