@@ -56,6 +56,7 @@ export const HELP_LINES = [
   `/${EXTENSION_COMMAND} mode auto|plain|execution-contract — choose rewrite mode`,
   `/${EXTENSION_COMMAND} enhancer-model active — use the active model (default)`,
   `/${EXTENSION_COMMAND} enhancer-model fixed <provider>/<id> — pin one enhancer model`,
+  `/${EXTENSION_COMMAND} enhancer-model fallback <provider>/<id> [provider/id...]|off — set the fallback chain`,
   `/${EXTENSION_COMMAND} conversation on|off — include recent chat context`,
   `/${EXTENSION_COMMAND} project-metadata on|off — include project metadata`,
   `/${EXTENSION_COMMAND} status-bar on|off — show status-bar text`,

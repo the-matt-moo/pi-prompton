@@ -59,6 +59,14 @@ export async function resolveEnhancerModel(
   }
 }
 
+export function resolveFallbackEnhancerModel(
+  modelRegistry: ModelRegistry,
+  targetFamily: PromptonFamily,
+  modelRef: ModelRef
+): Promise<ResolvedEnhancerModel> {
+  return resolveConfiguredModel(modelRegistry, targetFamily, modelRef, "fallback");
+}
+
 export function parseModelRef(value: string): ModelRef | undefined {
   const separatorIndex = value.indexOf("/");
   if (separatorIndex <= 0 || separatorIndex === value.length - 1) {

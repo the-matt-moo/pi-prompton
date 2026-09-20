@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0]
+
+### Features
+
+* **prompton:** add a configurable ordered enhancer fallback chain for format and provider failures
+* **prompton:** migrate legacy single-model fallback settings into the fallback chain
+
+### Bug Fixes
+
+* **prompton:** repeat the exact sentinel contract in user and retry messages for models that ignore system-only formatting instructions
+
 ## [0.6.1]
 
 ### Bug Fixes

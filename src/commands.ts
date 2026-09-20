@@ -283,7 +283,7 @@ export function getPromptonArgumentCompletions(
   const valueOptions: Record<string, string[]> = {
     family: ["auto", "gpt", "claude"],
     mode: ["auto", "plain", "execution-contract"],
-    "enhancer-model": ["active", "fixed", "family-linked"],
+    "enhancer-model": ["active", "fixed", "family-linked", "fallback"],
     map: ["active", "set", "add", "remove"],
     conversation: ["on", "off"],
     "project-metadata": ["on", "off"],
@@ -397,6 +397,30 @@ function handleEnhancerModelCommand(
       );
       return;
     }
+    case "fallback": {
+      const values = command.args.slice(1);
+      if (values.length === 1 && values[0] === "off") {
+        const next = { ...settings };
+        delete next.fallbackEnhancerModels;
+        persistSettings(ctx, runtime, services, next, "Enhancer fallback chain disabled.");
+        return;
+      }
+      const models = values.map(parseModelRef);
+      if (models.length === 0 || models.some((model) => !model)) {
+        throw new Error(
+          "Usage: /prompton enhancer-model fallback <provider>/<id> [provider/id...]|off"
+        );
+      }
+      const fallbackEnhancerModels = models.filter((model) => model !== undefined);
+      persistSettings(
+        ctx,
+        runtime,
+        services,
+        { ...settings, fallbackEnhancerModels },
+        `Enhancer fallback chain set to ${fallbackEnhancerModels.map((model) => `${model.provider}/${model.id}`).join(" → ")}.`
+      );
+      return;
+    }
     case "family-linked": {
       const gptModel = parseModelRef(command.args[1] ?? "");
       const claudeModel = parseModelRef(command.args[2] ?? "");
@@ -415,7 +439,7 @@ function handleEnhancerModelCommand(
     }
     default:
       throw new Error(
-        "Usage: /prompton enhancer-model active|fixed <provider>/<id>|family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>"
+        "Usage: /prompton enhancer-model active|fixed <provider>/<id>|fallback <provider>/<id> [provider/id...]|off|family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>"
       );
   }
 }

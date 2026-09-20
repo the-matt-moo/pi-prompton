@@ -196,6 +196,15 @@ void test("unified execution-contract strategy includes XML guidance and intent 
   assert.match(text, /clear feature goal/i);
 });
 
+void test("unified strategy repeats the sentinel contract in the user message", () => {
+  const text = extractUserText(buildStrategyRequest(createPromptContext({})));
+
+  assert.match(
+    text,
+    /Return exactly one <prompton-enhanced-prompt>\.\.\.<\/prompton-enhanced-prompt> block and nothing else\.$/
+  );
+});
+
 void test("unified strategy propagates target family in context sections", () => {
   const request = buildStrategyRequest(
     createPromptContext({

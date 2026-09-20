@@ -89,6 +89,9 @@ void test("argument completions expose commands and common values", () => {
   assert.deepEqual(getPromptonArgumentCompletions("mode e"), [
     { value: "mode execution-contract", label: "mode execution-contract" },
   ]);
+  assert.deepEqual(getPromptonArgumentCompletions("enhancer-model fall"), [
+    { value: "enhancer-model fallback", label: "enhancer-model fallback" },
+  ]);
 });
 
 void test("help entries include short descriptions", () => {
@@ -96,6 +99,7 @@ void test("help entries include short descriptions", () => {
   assert.match(HELP_LINES, /\/prompton help — show this list/);
   assert.match(HELP_LINES, /\/prompton enhancer-model active — use the active model/);
   assert.match(HELP_LINES, /\/prompton enhancer-model fixed/);
+  assert.match(HELP_LINES, /\/prompton enhancer-model fallback/);
   // family-linked and map are intentionally hidden from short help
   assert.doesNotMatch(HELP_LINES, /family-linked/);
   assert.doesNotMatch(HELP_LINES, /map active/);
@@ -698,6 +702,58 @@ void test("invalid model output errors include model-specific diagnostics", asyn
   assert.match(message, /try \/prompton status/i);
 });
 
+void test("enhancement advances through format and provider failures in fallback order", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const primary = createModel();
+  const claude = createModel({ provider: "antigravity", id: "claude-sonnet-4-6" });
+  const codex = createModel({ provider: "openai-codex", id: "gpt-5.6-luna" });
+  const openrouter = createModel({ provider: "openrouter", id: "openai/gpt-5.4-mini" });
+  const ctx = createCommandContext({
+    model: primary,
+    editorText: "original draft",
+    allModels: [primary, claude, codex, openrouter],
+  });
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    fallbackEnhancerModels: [claude, codex, openrouter].map(({ provider, id }) => ({
+      provider,
+      id,
+    })),
+  });
+  const calledModels: string[] = [];
+
+  await handlePromptonCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, (model) => {
+      calledModels.push(`${model.provider}/${model.id}`);
+      if (calledModels.length <= 2 || model === codex) {
+        return Promise.resolve(createAssistantResponse("missing sentinel"));
+      }
+      if (model === claude) {
+        return Promise.resolve({
+          ...createAssistantResponse(""),
+          stopReason: "error",
+          errorMessage: "quota exhausted",
+        });
+      }
+      return Promise.resolve(createCompleteResponse("fallback prompt"));
+    })
+  );
+
+  assert.deepEqual(calledModels, [
+    "openai/gpt-5",
+    "openai/gpt-5",
+    "antigravity/claude-sonnet-4-6",
+    "openai-codex/gpt-5.6-luna",
+    "openrouter/openai/gpt-5.4-mini",
+  ]);
+  assert.equal(ctx.uiState.editorText, "fallback prompt");
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /fallback model/i);
+});
+
 void test("Antigravity Gemini enhancer reserves tokens for low reasoning", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
@@ -897,6 +953,28 @@ void test("enhancer-model fixed clears stale family-linked config", async () => 
   assert.equal(runtime.getSettings().enhancerModelMode, "fixed");
   assert.deepEqual(runtime.getSettings().fixedEnhancerModel, { provider: "openai", id: "gpt-5" });
   assert.equal(runtime.getSettings().familyEnhancerModels, undefined);
+});
+
+void test("enhancer-model fallback can be configured and disabled", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel() });
+  const services = createServices(harness, () => Promise.resolve(createCompleteResponse("unused")));
+
+  await handlePromptonCommand(
+    "enhancer-model fallback antigravity/claude-sonnet-4-6 openai-codex/gpt-5.6-luna openrouter/openai/gpt-5.4-mini",
+    ctx,
+    runtime,
+    services
+  );
+  assert.deepEqual(runtime.getSettings().fallbackEnhancerModels, [
+    { provider: "antigravity", id: "claude-sonnet-4-6" },
+    { provider: "openai-codex", id: "gpt-5.6-luna" },
+    { provider: "openrouter", id: "openai/gpt-5.4-mini" },
+  ]);
+
+  await handlePromptonCommand("enhancer-model fallback off", ctx, runtime, services);
+  assert.equal(runtime.getSettings().fallbackEnhancerModels, undefined);
 });
 
 void test("status-bar command updates the saved footer status setting", async () => {

@@ -71,6 +71,9 @@ export class PromptonRuntimeState {
           ...(this.lastEnhancementAttempt.enhancerModel
             ? { enhancerModel: { ...this.lastEnhancementAttempt.enhancerModel } }
             : {}),
+          ...(this.lastEnhancementAttempt.fallbackModel
+            ? { fallbackModel: { ...this.lastEnhancementAttempt.fallbackModel } }
+            : {}),
         }
       : undefined;
   }
@@ -79,6 +82,7 @@ export class PromptonRuntimeState {
     this.lastEnhancementAttempt = {
       ...attempt,
       ...(attempt.enhancerModel ? { enhancerModel: { ...attempt.enhancerModel } } : {}),
+      ...(attempt.fallbackModel ? { fallbackModel: { ...attempt.fallbackModel } } : {}),
     };
   }
 
@@ -120,6 +124,10 @@ export function sanitizeSettings(value: unknown): PromptonSettings | undefined {
 
   const fixedEnhancerModel = sanitizeModelRef(value.fixedEnhancerModel);
   const familyEnhancerModels = sanitizeFamilyEnhancerModels(value.familyEnhancerModels);
+  const fallbackEnhancerModels = sanitizeFallbackEnhancerModels(
+    value.fallbackEnhancerModels,
+    value.fallbackEnhancerModel
+  );
 
   return {
     version: DEFAULT_SETTINGS.version,
@@ -133,6 +141,7 @@ export function sanitizeSettings(value: unknown): PromptonSettings | undefined {
     enhancerModelMode: readEnhancerModelMode(value.enhancerModelMode),
     ...(fixedEnhancerModel ? { fixedEnhancerModel } : {}),
     ...(familyEnhancerModels ? { familyEnhancerModels } : {}),
+    ...(fallbackEnhancerModels.length > 0 ? { fallbackEnhancerModels } : {}),
     includeRecentConversation: readBoolean(
       value.includeRecentConversation,
       DEFAULT_SETTINGS.includeRecentConversation
@@ -179,6 +188,9 @@ export function cloneSettings(settings: PromptonSettings): PromptonSettings {
               : {}),
           },
         }
+      : {}),
+    ...(settings.fallbackEnhancerModels
+      ? { fallbackEnhancerModels: settings.fallbackEnhancerModels.map((model) => ({ ...model })) }
       : {}),
   };
 }
@@ -250,6 +262,19 @@ function dedupeFamilyOverrides(overrides: FamilyOverride[]): FamilyOverride[] {
   }
 
   return deduped;
+}
+
+function sanitizeFallbackEnhancerModels(value: unknown, legacyValue: unknown): ModelRef[] {
+  const values = Array.isArray(value) ? value : [legacyValue];
+  const seen = new Set<string>();
+  return values.flatMap((entry) => {
+    const model = sanitizeModelRef(entry);
+    if (!model) return [];
+    const key = `${normalize(model.provider)}/${normalize(model.id)}`;
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [model];
+  });
 }
 
 function sanitizeFamilyEnhancerModels(value: unknown): FamilyEnhancerModels | undefined {

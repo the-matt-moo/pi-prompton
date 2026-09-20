@@ -50,6 +50,7 @@ export interface PromptonSettings {
   enhancerModelMode: PromptonEnhancerModelMode;
   fixedEnhancerModel?: ModelRef;
   familyEnhancerModels?: FamilyEnhancerModels;
+  fallbackEnhancerModels?: ModelRef[];
   includeRecentConversation: boolean;
   includeProjectMetadata: boolean;
   statusBarEnabled: boolean;
@@ -76,7 +77,7 @@ export type PromptonRequestAuth = Pick<
 >;
 
 export interface ResolvedEnhancerModel {
-  mode: PromptonEnhancerModelMode;
+  mode: PromptonEnhancerModelMode | "fallback";
   family: PromptonFamily;
   model: Model<Api>;
   requestAuth: PromptonRequestAuth;
@@ -124,8 +125,11 @@ export interface PromptonDraftResolution {
 export interface PromptonEnhancementAttempt {
   outcome: "success" | "cancelled" | "failed";
   enhancerModel?: ModelRef;
+  fallbackModel?: ModelRef;
   retryUsed: boolean;
   recoveredAfterRetry: boolean;
+  fallbackUsed?: boolean;
+  recoveredAfterFallback?: boolean;
   detail?: string;
 }
 

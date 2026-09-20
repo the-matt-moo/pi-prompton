@@ -208,6 +208,10 @@ void test("settings persist across sessions globally", () => {
     rewriteMode: "plain",
     autoSendEnhancedPrompt: true,
     autoSendBusyBehavior: "followUp",
+    fallbackEnhancerModels: [
+      { provider: "anthropic", id: "claude-sonnet-4-6" },
+      { provider: "openai-codex", id: "gpt-5.6-luna" },
+    ],
     enhancementTimeoutMs: 12_000,
   });
 
@@ -220,6 +224,10 @@ void test("settings persist across sessions globally", () => {
   assert.equal(restoredRuntime.getSettings().rewriteMode, "plain");
   assert.equal(restoredRuntime.getSettings().autoSendEnhancedPrompt, true);
   assert.equal(restoredRuntime.getSettings().autoSendBusyBehavior, "followUp");
+  assert.deepEqual(restoredRuntime.getSettings().fallbackEnhancerModels, [
+    { provider: "anthropic", id: "claude-sonnet-4-6" },
+    { provider: "openai-codex", id: "gpt-5.6-luna" },
+  ]);
   assert.equal(restoredRuntime.getSettings().enhancementTimeoutMs, 12_000);
 });
 
@@ -257,6 +265,16 @@ void test("sanitizeSettings restores clarify settings and defaults missing value
   );
   assert.equal(sanitizeSettings({ version: 1 })?.clarifyEnabled, false);
   assert.equal(sanitizeSettings({ version: 1 })?.clarifyOnShortcut, false);
+});
+
+void test("sanitizeSettings migrates the legacy single fallback model", () => {
+  assert.deepEqual(
+    sanitizeSettings({
+      version: 1,
+      fallbackEnhancerModel: { provider: "anthropic", id: "claude-sonnet-4-6" },
+    })?.fallbackEnhancerModels,
+    [{ provider: "anthropic", id: "claude-sonnet-4-6" }]
+  );
 });
 
 void test("sanitizeSettings normalizes shortcut keys and falls back on unsafe values", () => {
@@ -314,12 +332,14 @@ void test("sanitizeSettings rejects array-backed objects in record slots", () =>
     exactModelOverrides: [arrayBackedOverride],
     fixedEnhancerModel: arrayBackedRef,
     familyEnhancerModels: arrayBackedFamilyModels,
+    fallbackEnhancerModels: [arrayBackedRef],
   });
 
   assert.ok(sanitized);
   assert.deepEqual(sanitized.exactModelOverrides, []);
   assert.equal(sanitized.fixedEnhancerModel, undefined);
   assert.equal(sanitized.familyEnhancerModels, undefined);
+  assert.equal(sanitized.fallbackEnhancerModels, undefined);
 });
 
 void test("runtime support relies on hasUI instead of theme enumeration", () => {

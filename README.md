@@ -260,6 +260,7 @@ Quick config:
 /prompton mode auto|plain|execution-contract
 /prompton enhancer-model active
 /prompton enhancer-model fixed <provider>/<id>
+/prompton enhancer-model fallback <provider>/<id> [provider/id...]|off
 /prompton enhancer-model family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>
 /prompton map active <gpt|claude>
 /prompton map set <provider>/<id> <gpt|claude>
@@ -301,6 +302,7 @@ Stored at `~/.pi/agent/prompton-settings.json`. On first use after upgrading fro
 | auto-send                | `false`    |
 | auto-send while busy     | `steer`    |
 | preserve code blocks     | `true`     |
+| enhancer fallback chain  | `off`      |
 | enhancement timeout      | `45s`      |
 | clarify before enhancing | `off`      |
 | clarify on shortcut      | `off`      |
@@ -328,14 +330,14 @@ Target-family resolution order:
 
 Built-in defaults: OpenAI GPT/o-series → `gpt`, Anthropic Claude → `claude`, Kimi-style → `claude`.
 
-Enhancer model modes: `active`, `fixed`, `family-linked`.
+Enhancer model modes: `active`, `fixed`, `family-linked`. Optional fallback models run in order after primary format or provider failures; each fallback is tried once.
 
 ## Safety
 
 - Editor not mutated on failure or cancellation
 - Hung requests time out; only one enhancement runs at a time
 - Preview mode: review before replace
-- Output must contain exactly one sentinel block; bad first response retried once with stricter format reminder before failing closed
+- Output must contain exactly one sentinel block; bad primary output is retried once, then configured fallback models are tried in order on format or provider failures
 - Invalid output reports whether the model missed the sentinel, emitted multiple blocks, added extra text, or returned empty
 - GPT calls request concise output where the provider supports verbosity controls
 - Collapsed Pi paste markers recovered from clipboard where possible; multi-marker drafts fail closed

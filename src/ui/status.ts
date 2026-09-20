@@ -91,6 +91,7 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptonRuntim
     `include recent conversation: ${settings.includeRecentConversation}`,
     `include project metadata: ${settings.includeProjectMetadata}`,
     `rewrite strength: ${settings.rewriteStrength}`,
+    `enhancer fallback chain: ${settings.fallbackEnhancerModels?.map((model) => `${model.provider}/${model.id}`).join(" → ") || "off"}`,
     `enhancement timeout: ${Math.floor(settings.enhancementTimeoutMs / 1_000)}s`,
     `preview before replace: ${settings.previewBeforeReplace}`,
     `auto-send enhanced prompt: ${settings.autoSendEnhancedPrompt}`,
@@ -136,8 +137,19 @@ function createStatusSnapshot(
 function describeRetryStatus(
   snapshot: NonNullable<PromptonStatusSnapshot["lastEnhancementAttempt"]>
 ): string {
+  if (snapshot.recoveredAfterFallback) {
+    const model = snapshot.fallbackModel
+      ? ` (${snapshot.fallbackModel.provider}/${snapshot.fallbackModel.id})`
+      : "";
+    return `recovered with fallback${model}`;
+  }
+
   if (snapshot.recoveredAfterRetry) {
     return "recovered after one retry";
+  }
+
+  if (snapshot.fallbackUsed) {
+    return "retry and fallback chain used but did not recover";
   }
 
   if (snapshot.retryUsed) {

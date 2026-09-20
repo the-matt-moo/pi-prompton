@@ -7,12 +7,16 @@ import type {
   ProviderStreamOptions,
 } from "@earendil-works/pi-ai";
 import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  ModelRegistry,
+} from "@earendil-works/pi-coding-agent";
 import { BorderedLoader } from "@earendil-works/pi-coding-agent";
 import { buildPromptContext, estimateTextTokens } from "./context.js";
 import { resolveEditorDraft } from "./editor-draft.js";
 import { clarifyDraft } from "./clarify.js";
-import { resolveEnhancerModel } from "./model-selection.js";
+import { resolveEnhancerModel, resolveFallbackEnhancerModel } from "./model-selection.js";
 import { resolveTargetFamily } from "./model-routing.js";
 import {
   buildSentinelReminder,
@@ -25,8 +29,10 @@ import type { PromptonRuntimeState } from "./state.js";
 import { buildStrategyRequest } from "./strategies/unified.js";
 import type {
   EnhancementPreparation,
+  ModelRef,
   PromptonEnhancementAttempt,
   PromptonSettings,
+  ResolvedEnhancerModel,
 } from "./types.js";
 import {
   detectRuntimeSupport,
@@ -58,7 +64,26 @@ export interface EnhancementServices {
 interface EnhancementAttemptTracker {
   retryUsed: boolean;
   recoveredAfterRetry: boolean;
+  fallbackUsed: boolean;
+  recoveredAfterFallback: boolean;
+  fallbackModel?: ModelRef;
   failureDetail?: string;
+}
+
+type CompletionAttempt =
+  | { outcome: "success"; prompt: string }
+  | { outcome: "cancelled" }
+  | {
+      outcome: "invalid";
+      error: PromptonInvalidModelOutputError;
+      text: string;
+    }
+  | { outcome: "provider-error"; error: Error };
+
+interface CompletionFailure {
+  name: string;
+  modelLabel: string;
+  attempt: Exclude<CompletionAttempt, { outcome: "success" } | { outcome: "cancelled" }>;
 }
 
 export async function enhanceEditorDraft(
@@ -104,6 +129,8 @@ export async function enhanceEditorDraft(
   const tracker: EnhancementAttemptTracker = {
     retryUsed: false,
     recoveredAfterRetry: false,
+    fallbackUsed: false,
+    recoveredAfterFallback: false,
   };
 
   try {
@@ -124,7 +151,9 @@ export async function enhanceEditorDraft(
           services.completeFn,
           signal,
           services.enhancementTimeoutMs ?? settings.enhancementTimeoutMs,
-          tracker
+          tracker,
+          settings.fallbackEnhancerModels ?? [],
+          ctx.modelRegistry
         )
     );
 
@@ -265,14 +294,18 @@ async function generateEnhancedPrompt(
   completeFn: CompleteFn,
   signal: AbortSignal,
   timeoutMs: number,
-  tracker: EnhancementAttemptTracker
+  tracker: EnhancementAttemptTracker,
+  fallbackModelRefs: ModelRef[],
+  modelRegistry: ModelRegistry
 ): Promise<string | null> {
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
   const requestSignal = AbortSignal.any([signal, timeoutController.signal]);
+  const failures: CompletionFailure[] = [];
+  const strictRequest = buildRetryRequest(preparation.request);
 
   try {
-    const primaryResponse = await runCompletion(
+    const primary = await runParsedCompletion(
       completeFn,
       preparation,
       preparation.request,
@@ -281,67 +314,136 @@ async function generateEnhancedPrompt(
       timeoutController.signal,
       timeoutMs
     );
-    if (primaryResponse === null) {
-      return null;
-    }
+    if (primary.outcome === "success") return primary.prompt;
+    if (primary.outcome === "cancelled") return null;
+    failures.push({
+      name: "Primary",
+      modelLabel: preparation.enhancerModel.label,
+      attempt: primary,
+    });
 
-    const primaryText = extractTextResponse(primaryResponse);
-
-    try {
-      return parseEnhancedPrompt(primaryText);
-    } catch (error) {
-      if (!isInvalidModelOutputError(error)) {
-        throw error;
-      }
-
+    if (primary.outcome === "invalid") {
       tracker.retryUsed = true;
-
-      const retryResponse = await runCompletion(
+      const retry = await runParsedCompletion(
         completeFn,
         preparation,
-        buildRetryRequest(preparation.request),
+        strictRequest,
         requestSignal,
         signal,
         timeoutController.signal,
         timeoutMs
       );
-      if (retryResponse === null) {
-        return null;
-      }
-
-      const retryText = extractTextResponse(retryResponse);
-
-      try {
-        const parsed = parseEnhancedPrompt(retryText);
+      if (retry.outcome === "success") {
         tracker.recoveredAfterRetry = true;
-        return parsed;
-      } catch (retryError) {
-        if (!isInvalidModelOutputError(retryError)) {
-          throw retryError;
-        }
-
-        tracker.failureDetail = buildInvalidModelOutputFailureSummary(error, retryError);
-        throw new Error(
-          buildInvalidModelOutputFailureMessage(
-            preparation.enhancerModel.label,
-            error,
-            primaryText,
-            retryError,
-            retryText
-          )
-        );
+        return retry.prompt;
       }
+      if (retry.outcome === "cancelled") return null;
+      failures.push({ name: "Retry", modelLabel: preparation.enhancerModel.label, attempt: retry });
     }
+
+    const primaryModel = preparation.enhancerModel.model;
+    const seen = new Set([`${primaryModel.provider}/${primaryModel.id}`.toLowerCase()]);
+    let fallbackNumber = 0;
+
+    for (const fallbackModelRef of fallbackModelRefs) {
+      const key = `${fallbackModelRef.provider}/${fallbackModelRef.id}`.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      fallbackNumber += 1;
+      tracker.fallbackUsed = true;
+
+      let fallbackModel: ResolvedEnhancerModel;
+      try {
+        fallbackModel = await resolveFallbackEnhancerModel(
+          modelRegistry,
+          preparation.resolvedTargetFamily.family,
+          fallbackModelRef
+        );
+      } catch (error) {
+        failures.push({
+          name: `Fallback ${fallbackNumber}`,
+          modelLabel: `${fallbackModelRef.provider}/${fallbackModelRef.id}`,
+          attempt: {
+            outcome: "provider-error",
+            error: error instanceof Error ? error : new Error(String(error)),
+          },
+        });
+        continue;
+      }
+
+      const fallbackPreparation = { ...preparation, enhancerModel: fallbackModel };
+      tracker.fallbackModel = {
+        provider: fallbackModel.model.provider,
+        id: fallbackModel.model.id,
+      };
+      const fallback = await runParsedCompletion(
+        completeFn,
+        fallbackPreparation,
+        strictRequest,
+        requestSignal,
+        signal,
+        timeoutController.signal,
+        timeoutMs
+      );
+      if (fallback.outcome === "success") {
+        tracker.recoveredAfterFallback = true;
+        return fallback.prompt;
+      }
+      if (fallback.outcome === "cancelled") return null;
+      failures.push({
+        name: `Fallback ${fallbackNumber}`,
+        modelLabel: fallbackModel.label,
+        attempt: fallback,
+      });
+    }
+
+    tracker.failureDetail = buildCompletionFailureSummary(failures);
+    throw new Error(buildCompletionFailureMessage(preparation.enhancerModel.label, failures));
   } catch (error) {
-    if (signal.aborted) {
-      return null;
-    }
-    if (timeoutController.signal.aborted) {
-      throw createTimeoutError(timeoutMs);
-    }
+    if (signal.aborted) return null;
+    if (timeoutController.signal.aborted) throw createTimeoutError(timeoutMs);
     throw error;
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+async function runParsedCompletion(
+  completeFn: CompleteFn,
+  preparation: EnhancementPreparation,
+  request: Context,
+  requestSignal: AbortSignal,
+  signal: AbortSignal,
+  timeoutSignal: AbortSignal,
+  timeoutMs: number
+): Promise<CompletionAttempt> {
+  let response: AssistantMessage | null;
+  try {
+    response = await runCompletion(
+      completeFn,
+      preparation,
+      request,
+      requestSignal,
+      signal,
+      timeoutSignal,
+      timeoutMs
+    );
+  } catch (error) {
+    if (signal.aborted) return { outcome: "cancelled" };
+    if (timeoutSignal.aborted) throw error;
+    return {
+      outcome: "provider-error",
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
+  }
+
+  if (response === null) return { outcome: "cancelled" };
+  const text = extractTextResponse(response);
+  try {
+    return { outcome: "success", prompt: parseEnhancedPrompt(text) };
+  } catch (error) {
+    if (!isInvalidModelOutputError(error)) throw error;
+    return { outcome: "invalid", error, text };
   }
 }
 
@@ -457,7 +559,7 @@ function buildRetryRequest(request: Context): Context {
           part.type === "text"
             ? {
                 ...part,
-                text: `${part.text}\n\nIMPORTANT: Reply with exactly one sentinel block and no surrounding commentary.`,
+                text: `${part.text}\n\nIMPORTANT: ${buildSentinelReminder()}`,
               }
             : part
         )
@@ -489,6 +591,9 @@ function buildEnhancementAttempt(
     },
     retryUsed: tracker.retryUsed,
     recoveredAfterRetry: tracker.recoveredAfterRetry,
+    fallbackUsed: tracker.fallbackUsed,
+    recoveredAfterFallback: tracker.recoveredAfterFallback,
+    ...(tracker.fallbackModel ? { fallbackModel: tracker.fallbackModel } : {}),
     ...(tracker.failureDetail ? { detail: tracker.failureDetail } : {}),
   };
 }
@@ -501,6 +606,9 @@ function buildSuccessMessage(
   const action = autoSent ? "enhanced and sent the refined prompt" : "enhanced the current draft";
   const tokenSuffix = finalText ? ` (~${estimateTextTokens(finalText)} tokens)` : "";
 
+  if (tracker.recoveredAfterFallback) {
+    return `Prompton ${action} with the configured fallback model.${tokenSuffix}`;
+  }
   return tracker.recoveredAfterRetry
     ? `Prompton ${action} after retrying the model output format once.${tokenSuffix}`
     : `Prompton ${action}.${tokenSuffix}`;
@@ -540,28 +648,45 @@ function sendEnhancedPromptIfConfigured(
   }
 }
 
-function buildInvalidModelOutputFailureSummary(
-  primaryError: PromptonInvalidModelOutputError,
-  retryError: PromptonInvalidModelOutputError
-): string {
-  return `primary: ${describeInvalidModelOutputReason(primaryError.reason)}; retry: ${describeInvalidModelOutputReason(retryError.reason)}`;
+function buildCompletionFailureSummary(failures: CompletionFailure[]): string {
+  return failures
+    .map(({ name, modelLabel, attempt }) =>
+      attempt.outcome === "invalid"
+        ? `${name.toLowerCase()} ${modelLabel}: ${describeInvalidModelOutputReason(attempt.error.reason)}`
+        : `${name.toLowerCase()} ${modelLabel}: ${attempt.error.message}`
+    )
+    .join("; ");
 }
 
-function buildInvalidModelOutputFailureMessage(
+function buildCompletionFailureMessage(
   enhancerModelLabel: string,
-  primaryError: PromptonInvalidModelOutputError,
-  primaryText: string,
-  retryError: PromptonInvalidModelOutputError,
-  retryText: string
+  failures: CompletionFailure[]
 ): string {
+  const primaryInvalidTwice =
+    failures[0]?.name === "Primary" &&
+    failures[0].attempt.outcome === "invalid" &&
+    failures[1]?.name === "Retry" &&
+    failures[1].attempt.outcome === "invalid";
+  const fallbackFailures = failures.some((failure) => failure.name.startsWith("Fallback"));
+
   return [
-    `Prompton enhancer model ${enhancerModelLabel} returned invalid output twice.`,
-    `Primary failure: ${describeInvalidModelOutputReason(primaryError.reason)}.`,
-    `Retry failure: ${describeInvalidModelOutputReason(retryError.reason)}.`,
-    `Expected exactly one sentinel block: ${buildSentinelReminder()}`,
-    `Primary response preview: ${formatModelOutputPreview(primaryText)}`,
-    `Retry response preview: ${formatModelOutputPreview(retryText)}`,
-    "Try /prompton status to inspect the current enhancer configuration or switch to a more format-reliable enhancer model.",
+    primaryInvalidTwice
+      ? `Prompton enhancer model ${enhancerModelLabel} returned invalid output twice${fallbackFailures ? ", and all configured fallbacks failed." : "."}`
+      : `Prompton enhancer model ${enhancerModelLabel} failed${fallbackFailures ? ", and all configured fallbacks failed." : "."}`,
+    ...failures.map(({ name, modelLabel, attempt }) =>
+      attempt.outcome === "invalid"
+        ? `${name} failure${name.startsWith("Fallback") ? ` (${modelLabel})` : ""}: ${describeInvalidModelOutputReason(attempt.error.reason)}.`
+        : `${name} provider failure (${modelLabel}): ${attempt.error.message}`
+    ),
+    ...(failures.some((failure) => failure.attempt.outcome === "invalid")
+      ? [`Expected exactly one sentinel block: ${buildSentinelReminder()}`]
+      : []),
+    ...failures.flatMap(({ name, attempt }) =>
+      attempt.outcome === "invalid"
+        ? [`${name} response preview: ${formatModelOutputPreview(attempt.text)}`]
+        : []
+    ),
+    "Try /prompton status to inspect the current enhancer configuration.",
   ].join("\n");
 }
 
