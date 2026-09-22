@@ -6,6 +6,10 @@
 
 Prompt-rewriting extension for [Pi](https://github.com/earendil-works/pi-mono). Takes a rough draft in the Pi editor and turns it into a cleaner, stronger prompt without leaving the editor.
 
+<p align="center">
+  <img src="assets/pi-prompton-demo.gif" alt="pi-prompton demo" width="100%" />
+</p>
+
 > **Fork of [ayagmar/pi-promptsmith](https://github.com/ayagmar/pi-promptsmith)** — original work by [@ayagmar](https://github.com/ayagmar). This fork is maintained separately and may diverge.
 
 Two output styles:
