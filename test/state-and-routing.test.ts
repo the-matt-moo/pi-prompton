@@ -119,43 +119,34 @@ void test("matchesPattern supports provider and raw model-id globs", () => {
   assert.equal(matchesPattern("anthropic/*", "openai/gpt-5", "gpt-5"), false);
 });
 
-void test("resolveEnhancerModel validates configuration and API keys", async () => {
+void test("resolveEnhancerModel validates configuration", () => {
   const model = createModel();
   const ctx = createCommandContext({ model, allModels: [model] });
   const settings = createRuntimeState().getSettings();
 
-  const resolved = await resolveEnhancerModel(settings, "gpt", model, ctx.modelRegistry);
+  const resolved = resolveEnhancerModel(settings, "gpt", model, ctx.modelRegistry);
   assert.equal(resolved.label, "active (openai/gpt-5)");
-  assert.equal(resolved.requestAuth.apiKey, "test-key");
 
-  await assert.rejects(
-    resolveEnhancerModel(
-      { ...settings, enhancerModelMode: "fixed" },
-      "gpt",
-      model,
-      ctx.modelRegistry
-    ),
+  assert.throws(
+    () =>
+      resolveEnhancerModel(
+        { ...settings, enhancerModelMode: "fixed" },
+        "gpt",
+        model,
+        ctx.modelRegistry
+      ),
     /no fixed enhancer model is configured/i
   );
 
-  await assert.rejects(
-    resolveEnhancerModel(
-      { ...settings, enhancerModelMode: "bogus" as never },
-      "gpt",
-      model,
-      ctx.modelRegistry
-    ),
+  assert.throws(
+    () =>
+      resolveEnhancerModel(
+        { ...settings, enhancerModelMode: "bogus" as never },
+        "gpt",
+        model,
+        ctx.modelRegistry
+      ),
     /unsupported enhancer-model mode: bogus/i
-  );
-
-  const noKeyCtx = createCommandContext({
-    model,
-    allModels: [model],
-    apiKeys: new Map([["openai/gpt-5", undefined]]),
-  });
-  await assert.rejects(
-    resolveEnhancerModel(settings, "gpt", model, noKeyCtx.modelRegistry),
-    /could not resolve request auth.*missing api credentials/i
   );
 });
 

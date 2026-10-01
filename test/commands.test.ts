@@ -121,7 +121,7 @@ void test("prompton command enhances the current editor draft", async () => {
   assert.match(ctx.uiState.notifications.map((entry) => entry.message).join("\n"), /enhanced/i);
 });
 
-void test("prompton command forwards model request headers to the enhancer", async () => {
+void test("prompton command leaves credential resolution to the model registry", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
   const model = createModel();
@@ -143,8 +143,8 @@ void test("prompton command forwards model request headers to the enhancer", asy
     })
   );
 
-  assert.equal(requestOptions?.apiKey, "test-key");
-  assert.deepEqual(requestOptions?.headers, { "x-prompton-test": "1" });
+  assert.equal(requestOptions?.apiKey, undefined);
+  assert.deepEqual(requestOptions?.headers, undefined);
 });
 
 void test("prompton command asks Codex Responses enhancer models for concise text", async () => {

@@ -41,6 +41,8 @@ Two output styles:
 
 ## Installation
 
+> Requires Pi 1.x (tested with Pi 1.0.0).
+
 Run once without installing:
 
 ```bash

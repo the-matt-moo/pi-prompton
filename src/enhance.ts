@@ -228,7 +228,7 @@ async function prepareEnhancement(
   services: Pick<EnhancementServices, "exec">
 ): Promise<EnhancementPreparation> {
   const resolvedTargetFamily = resolveTargetFamily(settings, ctx.model);
-  const enhancerModel = await resolveEnhancerModel(
+  const enhancerModel = resolveEnhancerModel(
     settings,
     resolvedTargetFamily.family,
     ctx.model,
@@ -359,7 +359,7 @@ async function generateEnhancedPrompt(
 
       let fallbackModel: ResolvedEnhancerModel;
       try {
-        fallbackModel = await resolveFallbackEnhancerModel(
+        fallbackModel = resolveFallbackEnhancerModel(
           modelRegistry,
           preparation.resolvedTargetFamily.family,
           fallbackModelRef
@@ -522,13 +522,9 @@ function buildCompletionOptions(
   preparation: EnhancementPreparation,
   requestSignal: AbortSignal
 ): CompleteOptions {
-  const { apiKey, headers } = preparation.enhancerModel.requestAuth;
-
   const model = preparation.enhancerModel.model;
 
   return {
-    ...(typeof apiKey === "string" ? { apiKey } : {}),
-    ...(headers ? { headers } : {}),
     ...buildGptCompletionOptions(model),
     ...buildReasoningCompletionOptions(model),
     signal: requestSignal,

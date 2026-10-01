@@ -1,5 +1,5 @@
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
-import type { ExtensionContext, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export type PromptonFamily = "gpt" | "claude";
 export type PromptonTargetFamilyMode = "auto" | PromptonFamily;
@@ -75,16 +75,10 @@ export interface ResolvedTargetFamily {
   matchedRule?: string;
 }
 
-export type PromptonRequestAuth = Pick<
-  Extract<Awaited<ReturnType<ModelRegistry["getApiKeyAndHeaders"]>>, { ok: true }>,
-  "apiKey" | "headers"
->;
-
 export interface ResolvedEnhancerModel {
   mode: PromptonEnhancerModelMode | "fallback";
   family: PromptonFamily;
   model: Model<Api>;
-  requestAuth: PromptonRequestAuth;
   label: string;
 }
 

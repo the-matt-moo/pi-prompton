@@ -36,14 +36,7 @@ export async function runEnhancerTextTask(
   try {
     const settings = runtime.getSettings();
     const targetFamily = resolveTargetFamily(settings, ctx.model).family;
-    const enhancer = await resolveEnhancerModel(
-      settings,
-      targetFamily,
-      ctx.model,
-      ctx.modelRegistry
-    );
-    const { apiKey, headers } = enhancer.requestAuth;
-
+    const enhancer = resolveEnhancerModel(settings, targetFamily, ctx.model, ctx.modelRegistry);
     const result = await services.runCancellableTask(ctx, options.label, async (signal) => {
       const timeout = new AbortController();
       const timeoutId = setTimeout(() => timeout.abort(), settings.enhancementTimeoutMs);
@@ -64,8 +57,6 @@ export async function runEnhancerTextTask(
               ],
             },
             {
-              ...(typeof apiKey === "string" ? { apiKey } : {}),
-              ...(headers ? { headers } : {}),
               signal: requestSignal,
               maxTokens: Math.min(enhancer.model.maxTokens, options.maxTokens),
             }

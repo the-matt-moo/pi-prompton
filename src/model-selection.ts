@@ -1,30 +1,22 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type {
-  ModelRef,
-  PromptonFamily,
-  PromptonRequestAuth,
-  PromptonSettings,
-  ResolvedEnhancerModel,
-} from "./types.js";
+import type { ModelRef, PromptonFamily, PromptonSettings, ResolvedEnhancerModel } from "./types.js";
 
-export async function resolveEnhancerModel(
+export function resolveEnhancerModel(
   settings: PromptonSettings,
   targetFamily: PromptonFamily,
   activeModel: Model<Api> | undefined,
   modelRegistry: ModelRegistry
-): Promise<ResolvedEnhancerModel> {
+): ResolvedEnhancerModel {
   switch (settings.enhancerModelMode) {
     case "active": {
       if (!activeModel) {
         throw new Error("Prompton requires an active model when enhancer-model mode is 'active'.");
       }
-      const requestAuth = await resolveRequestAuth(modelRegistry, activeModel);
       return {
         mode: "active",
         family: targetFamily,
         model: activeModel,
-        requestAuth,
         label: `active (${activeModel.provider}/${activeModel.id})`,
       };
     }
@@ -63,7 +55,7 @@ export function resolveFallbackEnhancerModel(
   modelRegistry: ModelRegistry,
   targetFamily: PromptonFamily,
   modelRef: ModelRef
-): Promise<ResolvedEnhancerModel> {
+): ResolvedEnhancerModel {
   return resolveConfiguredModel(modelRegistry, targetFamily, modelRef, "fallback");
 }
 
@@ -82,12 +74,12 @@ export function parseModelRef(value: string): ModelRef | undefined {
   return { provider, id };
 }
 
-async function resolveConfiguredModel(
+function resolveConfiguredModel(
   modelRegistry: ModelRegistry,
   targetFamily: PromptonFamily,
   modelRef: ModelRef,
   mode: ResolvedEnhancerModel["mode"]
-): Promise<ResolvedEnhancerModel> {
+): ResolvedEnhancerModel {
   const model = modelRegistry.find(modelRef.provider, modelRef.id);
   if (!model) {
     throw new Error(
@@ -95,29 +87,10 @@ async function resolveConfiguredModel(
     );
   }
 
-  const requestAuth = await resolveRequestAuth(modelRegistry, model);
   return {
     mode,
     family: targetFamily,
     model,
-    requestAuth,
     label: `${model.provider}/${model.id}`,
-  };
-}
-
-async function resolveRequestAuth(
-  modelRegistry: ModelRegistry,
-  model: Model<Api>
-): Promise<PromptonRequestAuth> {
-  const auth = await modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok) {
-    throw new Error(
-      `Prompton could not resolve request auth for ${model.provider}/${model.id}: ${auth.error}`
-    );
-  }
-
-  return {
-    ...(typeof auth.apiKey === "string" ? { apiKey: auth.apiKey } : {}),
-    ...(auth.headers ? { headers: auth.headers } : {}),
   };
 }

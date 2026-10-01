@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.1]
+
+### Changed
+
+* **prompton:** require and test against Pi 1.x; enhancer calls now use Pi's model registry for credential resolution instead of the temporary `pi-ai/compat` API
+
 ## [0.8.0]
 
 ### Features

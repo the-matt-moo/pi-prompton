@@ -1,4 +1,3 @@
-import { complete } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { CompleteFn } from "./enhance.js";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";
@@ -75,7 +74,7 @@ export function createPromptonExtension(
         () => runtime.getSettings(),
         () => {
           void handlePromptonShortcut(ctx, runtime, {
-            completeFn: options?.completeFn ?? complete,
+            completeFn: options?.completeFn ?? ctx.modelRegistry.complete.bind(ctx.modelRegistry),
             exec: pi.exec.bind(pi),
             sendUserMessage: pi.sendUserMessage.bind(pi),
             refreshStatus,
@@ -93,16 +92,16 @@ export function createPromptonExtension(
 
   const triggerDefaultShortcut = async (ctx: ExtensionContext): Promise<void> => {
     const settings = runtime.getSettings();
-    const shortcutServices = {
-      completeFn: options?.completeFn ?? complete,
+    const shortcutServices = () => ({
+      completeFn: options?.completeFn ?? ctx.modelRegistry.complete.bind(ctx.modelRegistry),
       exec: pi.exec.bind(pi),
       sendUserMessage: pi.sendUserMessage.bind(pi),
       refreshStatus,
       runCancellableTask: runEnhancementWithLoader,
-    };
+    });
 
     if (!settings.enabled) {
-      await handlePromptonShortcut(ctx, runtime, shortcutServices);
+      await handlePromptonShortcut(ctx, runtime, shortcutServices());
       return;
     }
 
@@ -119,7 +118,7 @@ export function createPromptonExtension(
       return;
     }
 
-    await handlePromptonShortcut(ctx, runtime, shortcutServices);
+    await handlePromptonShortcut(ctx, runtime, shortcutServices());
   };
 
   const restorePersistedSettings = (ctx: ExtensionContext): void => {
@@ -145,7 +144,7 @@ export function createPromptonExtension(
     getArgumentCompletions: getPromptonArgumentCompletions,
     handler: async (args, ctx) => {
       await handlePromptonCommand(args, ctx, runtime, {
-        completeFn: options?.completeFn ?? complete,
+        completeFn: options?.completeFn ?? ctx.modelRegistry.complete.bind(ctx.modelRegistry),
         exec: pi.exec.bind(pi),
         sendUserMessage: pi.sendUserMessage.bind(pi),
         refreshStatus,
