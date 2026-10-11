@@ -265,7 +265,7 @@ void test("status resolves the fallback family even when no active model is sele
   const report = buildStatusReport(ctx, runtime);
 
   assert.match(report, /active model: none/);
-  assert.match(report, /resolved target family: claude via fallback/);
+  assert.match(report, /output target: universal \(enhancer route: claude via fallback\)/);
 });
 
 void test("status line stays hidden by default", () => {
@@ -390,6 +390,121 @@ void test("status report includes the last enhancement attempt details", () => {
     report,
     /last enhancement detail: primary: missing sentinel block; retry: unexpected text outside the sentinel block/
   );
+});
+
+void test("auto mode resolves universal output target regardless of active model", async () => {
+  const model = createModel({ provider: "openai", id: "gpt-5" });
+  const runtime = createRuntimeState();
+  const ctx = createCommandContext({ model, entries: [] });
+
+  const promptContext = await buildPromptContext({
+    ctx,
+    draft: "Explain how routing works.",
+    settings: runtime.getSettings(), // targetFamilyMode: "auto"
+    activeModel: model,
+    targetFamily: "gpt",
+    enhancerModel: model,
+    exec: () => Promise.resolve({ stdout: "", stderr: "", code: 0 }),
+  });
+
+  assert.equal(promptContext.targetFamily, "universal");
+  assert.equal(promptContext.activeModel, undefined);
+});
+
+void test("auto mode resolves universal even with claude active model and overrides", async () => {
+  const model = createModel({ provider: "anthropic", id: "claude-sonnet-4-6" });
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    exactModelOverrides: [
+      { provider: "anthropic", id: "claude-sonnet-4-6", family: "claude" as const },
+    ],
+  });
+  const ctx = createCommandContext({ model, entries: [] });
+
+  const promptContext = await buildPromptContext({
+    ctx,
+    draft: "Implement this feature.",
+    settings: runtime.getSettings(),
+    activeModel: model,
+    targetFamily: "claude",
+    enhancerModel: model,
+    exec: () => Promise.resolve({ stdout: "", stderr: "", code: 0 }),
+  });
+
+  assert.equal(promptContext.targetFamily, "universal");
+  assert.equal(promptContext.activeModel, undefined);
+});
+
+void test("explicit gpt mode produces gpt-targeted output with active model", async () => {
+  const model = createModel({ provider: "openai", id: "gpt-5" });
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), targetFamilyMode: "gpt" });
+  const ctx = createCommandContext({ model, entries: [] });
+
+  const promptContext = await buildPromptContext({
+    ctx,
+    draft: "Explain this.",
+    settings: runtime.getSettings(),
+    activeModel: model,
+    targetFamily: "gpt",
+    enhancerModel: model,
+    exec: () => Promise.resolve({ stdout: "", stderr: "", code: 0 }),
+  });
+
+  assert.equal(promptContext.targetFamily, "gpt");
+  assert.deepEqual(promptContext.activeModel, { provider: "openai", id: "gpt-5" });
+});
+
+void test("explicit claude mode produces claude-targeted output with active model", async () => {
+  const model = createModel({ provider: "anthropic", id: "claude-sonnet-4-6" });
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), targetFamilyMode: "claude" });
+  const ctx = createCommandContext({ model, entries: [] });
+
+  const promptContext = await buildPromptContext({
+    ctx,
+    draft: "Explain this.",
+    settings: runtime.getSettings(),
+    activeModel: model,
+    targetFamily: "claude",
+    enhancerModel: model,
+    exec: () => Promise.resolve({ stdout: "", stderr: "", code: 0 }),
+  });
+
+  assert.equal(promptContext.targetFamily, "claude");
+  assert.deepEqual(promptContext.activeModel, { provider: "anthropic", id: "claude-sonnet-4-6" });
+});
+
+void test("universal request context sections exclude active_model and include universal target", () => {
+  const ctx = createPromptContext({
+    targetFamily: "universal",
+    effectiveRewriteMode: "plain",
+    intent: "general",
+  });
+  // Simulate auto mode: activeModel is omitted from the payload
+  delete (ctx as unknown as Record<string, unknown>).activeModel;
+  const request = buildStrategyRequest(ctx);
+  const text = `${request.systemPrompt}\n${extractUserText(request)}`;
+
+  assert.match(text, /<resolved_target_family>\s*universal/i);
+  assert.doesNotMatch(text, /active_model/);
+  assert.match(text, /model-agnostic/);
+});
+
+void test("explicit gpt request includes active_model and gpt target", () => {
+  const request = buildStrategyRequest(
+    createPromptContext({
+      targetFamily: "gpt",
+      activeModel: { provider: "openai", id: "gpt-5" },
+      effectiveRewriteMode: "plain",
+      intent: "general",
+    })
+  );
+  const text = extractUserText(request);
+
+  assert.match(text, /<resolved_target_family>\s*gpt/i);
+  assert.match(text, /<active_model>\s*openai\/gpt-5/);
 });
 
 function createPromptContext(overrides: Partial<PromptonContextPayload>): PromptonContextPayload {

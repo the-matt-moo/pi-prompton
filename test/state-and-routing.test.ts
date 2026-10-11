@@ -186,6 +186,30 @@ void test("setFamilyEnhancerModel clears orphaned partial family selections", ()
   });
 });
 
+void test("family-linked enhancer selection still resolves family from active model in auto mode", () => {
+  const gptModel = createModel({ provider: "openai", id: "gpt-5" });
+  const claudeEnhancer = { provider: "anthropic", id: "claude-sonnet-4-6" };
+  const gptEnhancer = { provider: "openai", id: "gpt-5" };
+  const ctx = createCommandContext({
+    model: gptModel,
+    allModels: [gptModel, createModel({ provider: "anthropic", id: "claude-sonnet-4-6" })],
+  });
+  const settings = {
+    ...createRuntimeState().getSettings(),
+    enhancerModelMode: "family-linked" as const,
+    familyEnhancerModels: { gpt: gptEnhancer, claude: claudeEnhancer },
+  };
+
+  // targetFamilyMode is "auto" (default), so output target is universal,
+  // but enhancer selection still resolves the active model's family.
+  const resolved = resolveTargetFamily(settings, gptModel);
+  assert.equal(resolved.family, "gpt");
+
+  const enhancer = resolveEnhancerModel(settings, resolved.family, gptModel, ctx.modelRegistry);
+  assert.equal(enhancer.mode, "family-linked");
+  assert.equal(enhancer.label, "openai/gpt-5");
+});
+
 void test("settings persist across sessions globally", () => {
   const storageDir = mkdtempSync(join(tmpdir(), "prompton-state-"));
   const settingsPath = join(storageDir, "prompton-settings.json");

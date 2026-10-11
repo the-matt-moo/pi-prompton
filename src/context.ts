@@ -13,6 +13,7 @@ import { detectTaskIntentSmart } from "./jev-intent.js";
 import type {
   BuildPromptContextOptions,
   ConversationExcerpt,
+  PromptonOutputTarget,
   ProjectMetadata,
   PromptonContextPayload,
 } from "./types.js";
@@ -66,10 +67,16 @@ export async function buildPromptContext(
     droppedContext.push("recent conversation");
   }
 
+  const outputTarget: PromptonOutputTarget =
+    settings.targetFamilyMode === "auto" ? "universal" : targetFamily;
+
   return {
     draft,
-    ...(activeModel ? { activeModel: { provider: activeModel.provider, id: activeModel.id } } : {}),
-    targetFamily,
+    // In universal (auto) mode the rewrite is model-agnostic; omit the consumer hint.
+    ...(settings.targetFamilyMode !== "auto" && activeModel
+      ? { activeModel: { provider: activeModel.provider, id: activeModel.id } }
+      : {}),
+    targetFamily: outputTarget,
     rewriteStrength: settings.rewriteStrength,
     configuredRewriteMode: settings.rewriteMode,
     effectiveRewriteMode: draftAnalysis.effectiveRewriteMode,

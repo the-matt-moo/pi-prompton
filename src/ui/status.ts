@@ -45,9 +45,13 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptonRuntim
   const activeModel = snapshot.activeModel
     ? `${snapshot.activeModel.provider}/${snapshot.activeModel.id}`
     : "none";
-  const resolvedFamily = snapshot.resolvedTargetFamily
+  const resolvedFamilyDetail = snapshot.resolvedTargetFamily
     ? `${snapshot.resolvedTargetFamily.family} via ${snapshot.resolvedTargetFamily.source}${snapshot.resolvedTargetFamily.matchedRule ? ` (${snapshot.resolvedTargetFamily.matchedRule})` : ""}`
     : "unresolved";
+  const resolvedFamily =
+    settings.targetFamilyMode === "auto"
+      ? `universal (enhancer route: ${resolvedFamilyDetail})`
+      : resolvedFamilyDetail;
   const support = detectRuntimeSupport(ctx);
   const currentDraftMode = !support.interactiveTui
     ? "unavailable outside interactive editor mode"
@@ -64,7 +68,7 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptonRuntim
   return [
     buildStatusLine(snapshot),
     `active model: ${activeModel}`,
-    `resolved target family: ${resolvedFamily}`,
+    `output target: ${resolvedFamily}`,
     `configured rewrite mode: ${settings.rewriteMode}`,
     `effective rewrite mode: ${currentDraftMode}`,
     `task intent: ${currentDraftIntent}`,

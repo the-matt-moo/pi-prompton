@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0]
+
+### Changed
+
+* **prompton:** `auto` target family now produces a universal, model-agnostic rewrite and omits the `active_model` hint, so dynamic routers such as pi-bifrost can pick the final model after rewriting
+* **prompton:** explicit `gpt`/`claude` targeting remains opt-in; `family-linked` enhancer selection still resolves the active model family independently
+* **prompton:** status, settings, help, and README label `auto` as universal and document that auto-send can bypass router classification
+
 ## [0.8.1]
 
 ### Changed

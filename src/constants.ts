@@ -54,7 +54,7 @@ export const HELP_LINES = [
   `/${EXTENSION_COMMAND} settings — open the settings UI`,
   `/${EXTENSION_COMMAND} reset-settings — restore global defaults`,
   `/${EXTENSION_COMMAND} enable|disable — toggle Prompton on or off`,
-  `/${EXTENSION_COMMAND} family auto|gpt|claude — choose the target family`,
+  `/${EXTENSION_COMMAND} family auto|gpt|claude — choose the output target (auto = universal)`,
   `/${EXTENSION_COMMAND} mode auto|plain|execution-contract — choose rewrite mode`,
   `/${EXTENSION_COMMAND} enhancer-model active — use the active model (default)`,
   `/${EXTENSION_COMMAND} enhancer-model fixed <provider>/<id> — pin one enhancer model`,

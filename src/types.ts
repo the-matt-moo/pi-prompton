@@ -3,6 +3,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export type PromptonFamily = "gpt" | "claude";
 export type PromptonTargetFamilyMode = "auto" | PromptonFamily;
+export type PromptonOutputTarget = PromptonFamily | "universal";
 export type PromptonEnhancerModelMode = "active" | "fixed" | "family-linked";
 export type PromptonRewriteStrength = "light" | "balanced" | "strong";
 export type PromptonRewriteMode = "auto" | "plain" | "execution-contract";
@@ -97,7 +98,7 @@ export interface ProjectMetadata {
 export interface PromptonContextPayload {
   draft: string;
   activeModel?: ModelRef;
-  targetFamily: PromptonFamily;
+  targetFamily: PromptonOutputTarget;
   rewriteStrength: PromptonRewriteStrength;
   configuredRewriteMode: PromptonRewriteMode;
   effectiveRewriteMode: PromptonEffectiveRewriteMode;

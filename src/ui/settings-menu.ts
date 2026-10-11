@@ -29,7 +29,7 @@ export type SettingsMenuOptionId =
   | "done";
 
 export const TARGET_FAMILY_OPTIONS = [
-  "auto — match the current model family",
+  "auto — universal model-agnostic rewrite",
   "gpt — always rewrite in GPT-style",
   "claude — always rewrite in Claude-style",
 ] as const;
@@ -354,7 +354,7 @@ export function formatTimeoutSeconds(timeoutMs: number): string {
 function describeTargetFamilyMode(settings: PromptonSettings): string {
   switch (settings.targetFamilyMode) {
     case "auto":
-      return "Auto (match current model)";
+      return "Auto (universal)";
     case "gpt":
       return "Force GPT-style";
     case "claude":

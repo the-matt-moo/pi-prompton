@@ -145,7 +145,7 @@ export async function enhanceEditorDraft(
 
     const outcome = await services.runCancellableTask(
       ctx,
-      `Prompton enhancing for ${prepared.resolvedTargetFamily.family} (${prepared.promptContext.effectiveRewriteMode})...`,
+      `Prompton enhancing for ${settings.targetFamilyMode === "auto" ? "universal" : prepared.resolvedTargetFamily.family} (${prepared.promptContext.effectiveRewriteMode})...`,
       (signal) =>
         generateEnhancedPrompt(
           prepared,

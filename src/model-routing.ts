@@ -107,5 +107,5 @@ export function describeResolvedFamily(
   resolved: ResolvedTargetFamily,
   mode: PromptonSettings["targetFamilyMode"]
 ): string {
-  return mode === "auto" ? `auto→${resolved.family}` : resolved.family;
+  return mode === "auto" ? "universal" : resolved.family;
 }

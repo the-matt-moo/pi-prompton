@@ -119,7 +119,8 @@ The result:
 
 - One request builder (`strategies/unified.ts`) replaces the former `strategies/gpt.ts` and `strategies/claude.ts`.
 - The best GPT-specific guidance (outcome-first structure, decision rules over step stacks, evidence/tool boundaries for agentic work) was promoted to universal instructions in the shared system prompt.
-- The enhancer still sees `resolved_target_family` in the context payload and adapts output structure when it materially improves execution for the target model — but the _enhancer prompt itself_ is model-agnostic.
+- When `targetFamilyMode` is `auto` (default), `resolved_target_family` is set to `universal` and the rewrite is fully model-agnostic — no `active_model` consumer hint is sent. Explicit `gpt` or `claude` modes still produce family-targeted output.
+- Enhancer model selection is independent of the output target: `family-linked` mode still resolves the active model's family to pick the right enhancer even when the output is universal.
 - `rewrite_strength` and `preserve_code_blocks` now have explicit behavioral semantics in the system prompt rather than relying on implicit interpretation.
 - XML-like sections are governed by one consistent rule: use them only when the draft already does or when they materially improve reliable execution or parsing.
 
@@ -326,7 +327,13 @@ Does not read repo files, `AGENTS.md`, or README by default.
 
 ## Routing
 
-Target-family resolution order:
+When `targetFamilyMode` is `auto` (the default), the output target is `universal` — a portable, model-agnostic rewrite with no `active_model` consumer hint. Explicit `gpt` or `claude` modes produce family-targeted output.
+
+Enhancer model selection is independent: `family-linked` mode still resolves the active model's family using the resolution order below, even when the output target is universal.
+
+Auto-send (`/prompton auto-send on`) is extension-originated and can bypass dynamic router classification; Prompton does not add a Bifrost protocol or impersonate remote-pi.
+
+Family resolution order (used for enhancer routing and explicit targeting):
 
 1. Forced family (when not `auto`)
 2. Exact model overrides
