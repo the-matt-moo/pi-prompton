@@ -81,7 +81,9 @@ export async function runTemplateCommand(
     currentDraft.trim() &&
     !(await ctx.ui.confirm(
       "Replace current draft?",
-      "The current editor text will be saved to undo history."
+      runtime.getSettings().historyEnabled
+        ? "The current editor text will be saved to undo history."
+        : "Prompt history tracking is off, so the current editor text will NOT be saved."
     ))
   ) {
     return;
@@ -106,7 +108,9 @@ export async function runInputCommand(
     currentDraft.trim() &&
     !(await ctx.ui.confirm(
       "Replace current draft?",
-      "The current editor text will be saved to undo history."
+      runtime.getSettings().historyEnabled
+        ? "The current editor text will be saved to undo history."
+        : "Prompt history tracking is off, so the current editor text will NOT be saved."
     ))
   ) {
     return;
@@ -123,6 +127,9 @@ export async function runHistoryCommand(
 ): Promise<void> {
   const support = detectRuntimeSupport(ctx);
   if (!support.interactiveTui) throw new Error(support.reason);
+  if (!runtime.getSettings().historyEnabled) {
+    throw new Error("Prompt history tracking is disabled. Enable it with /prompton history on.");
+  }
 
   const entries = runtime.undo.getHistory();
   if (entries.length === 0) throw new Error("No prompt history available.");
@@ -138,6 +145,10 @@ export async function runHistoryCommand(
     .reverse();
   const choice = await openSelectDialog(ctx, { title: "Prompt history", items, pageSize: 8 });
   if (choice === undefined) return;
+  if (!runtime.getSettings().historyEnabled) {
+    ctx.ui.notify("Prompt history tracking was disabled. Draft not restored.");
+    return;
+  }
 
   const entry = entries[Number(choice)];
   if (!entry) return;

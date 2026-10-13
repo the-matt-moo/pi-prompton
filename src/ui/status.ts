@@ -92,6 +92,7 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptonRuntim
     `shortcut enabled: ${settings.shortcutEnabled}`,
     `shortcut key: ${formatShortcutKey(settings.shortcutKey)}`,
     `status bar enabled: ${settings.statusBarEnabled}`,
+    `prompt history enabled: ${settings.historyEnabled}`,
     `include recent conversation: ${settings.includeRecentConversation}`,
     `include project metadata: ${settings.includeProjectMetadata}`,
     `rewrite strength: ${settings.rewriteStrength}`,

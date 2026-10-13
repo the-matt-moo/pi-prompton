@@ -25,16 +25,22 @@ export class PromptonRuntimeState {
   private busy = false;
   private lastDraftResolution: PromptonDraftResolution | undefined;
   private lastEnhancementAttempt: PromptonEnhancementAttempt | undefined;
-  readonly undo = new UndoManager();
+  readonly undo: UndoManager;
 
-  constructor(private readonly settingsPath = getGlobalSettingsPath()) {}
+  constructor(private readonly settingsPath = getGlobalSettingsPath()) {
+    this.undo = new UndoManager(() => this.settings.historyEnabled);
+  }
 
   getSettings(): PromptonSettings {
     return cloneSettings(this.settings);
   }
 
   replaceSettings(settings: PromptonSettings): void {
-    this.settings = cloneSettings(settings);
+    const nextSettings = cloneSettings(settings);
+    if (this.settings.historyEnabled && !nextSettings.historyEnabled) {
+      this.undo.clear();
+    }
+    this.settings = nextSettings;
     this.lastDraftResolution = undefined;
   }
 
@@ -166,6 +172,7 @@ export function sanitizeSettings(value: unknown): PromptonSettings | undefined {
     enhancementTimeoutMs: readEnhancementTimeoutMs(value.enhancementTimeoutMs),
     clarifyEnabled: readBoolean(value.clarifyEnabled, DEFAULT_SETTINGS.clarifyEnabled),
     clarifyOnShortcut: readBoolean(value.clarifyOnShortcut, DEFAULT_SETTINGS.clarifyOnShortcut),
+    historyEnabled: readBoolean(value.historyEnabled, DEFAULT_SETTINGS.historyEnabled),
     jevScoringEnabled: readBoolean(value.jevScoringEnabled, DEFAULT_SETTINGS.jevScoringEnabled),
     jevVerificationEnabled: readBoolean(
       value.jevVerificationEnabled,

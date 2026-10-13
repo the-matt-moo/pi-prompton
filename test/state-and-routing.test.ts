@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setFamilyEnhancerModel } from "../src/enhancer-settings.js";
@@ -218,6 +218,7 @@ void test("settings persist across sessions globally", () => {
   runtime.persistSettings({
     ...runtime.getSettings(),
     enabled: false,
+    historyEnabled: true,
     statusBarEnabled: true,
     shortcutKey: "ctrl+alt+p",
     rewriteMode: "plain",
@@ -234,6 +235,7 @@ void test("settings persist across sessions globally", () => {
   restoredRuntime.restoreSettings();
 
   assert.equal(restoredRuntime.getSettings().enabled, false);
+  assert.equal(restoredRuntime.getSettings().historyEnabled, true);
   assert.equal(restoredRuntime.getSettings().statusBarEnabled, true);
   assert.equal(restoredRuntime.getSettings().shortcutKey, "ctrl+alt+p");
   assert.equal(restoredRuntime.getSettings().rewriteMode, "plain");
@@ -244,6 +246,13 @@ void test("settings persist across sessions globally", () => {
     { provider: "openai-codex", id: "gpt-5.6-luna" },
   ]);
   assert.equal(restoredRuntime.getSettings().enhancementTimeoutMs, 12_000);
+
+  restoredRuntime.undo.store("session-only draft");
+  restoredRuntime.persistSettings({
+    ...restoredRuntime.getSettings(),
+    statusBarEnabled: false,
+  });
+  assert.doesNotMatch(readFileSync(settingsPath, "utf8"), /session-only draft/);
 });
 
 void test("failed global settings writes do not claim success or corrupt runtime state", () => {
@@ -268,18 +277,21 @@ void test("sanitizeSettings rejects unknown schema versions", () => {
   assert.equal(sanitizeSettings({ version: 2 }), undefined);
 });
 
-void test("sanitizeSettings restores clarify settings and defaults missing values", () => {
-  assert.equal(
-    sanitizeSettings({ version: 1, clarifyEnabled: true, clarifyOnShortcut: true })?.clarifyEnabled,
-    true
-  );
-  assert.equal(
-    sanitizeSettings({ version: 1, clarifyEnabled: true, clarifyOnShortcut: true })
-      ?.clarifyOnShortcut,
-    true
-  );
+void test("sanitizeSettings restores opt-in settings and defaults missing or invalid values", () => {
+  const enabled = sanitizeSettings({
+    version: 1,
+    clarifyEnabled: true,
+    clarifyOnShortcut: true,
+    historyEnabled: true,
+  });
+
+  assert.equal(enabled?.clarifyEnabled, true);
+  assert.equal(enabled?.clarifyOnShortcut, true);
+  assert.equal(enabled?.historyEnabled, true);
   assert.equal(sanitizeSettings({ version: 1 })?.clarifyEnabled, false);
   assert.equal(sanitizeSettings({ version: 1 })?.clarifyOnShortcut, false);
+  assert.equal(sanitizeSettings({ version: 1 })?.historyEnabled, false);
+  assert.equal(sanitizeSettings({ version: 1, historyEnabled: "yes" })?.historyEnabled, false);
 });
 
 void test("sanitizeSettings migrates the legacy single fallback model", () => {
@@ -378,8 +390,46 @@ void test("replacing settings clears stale draft analysis", () => {
   assert.equal(runtime.getLastDraftResolution(), undefined);
 });
 
+void test("undo manager bypasses all history APIs while disabled and clears entries on disable", () => {
+  const runtime = createRuntimeState();
+  const originalDateNow = Date.now;
+  let dateCalls = 0;
+  Date.now = () => {
+    dateCalls += 1;
+    return 123;
+  };
+
+  try {
+    runtime.undo.store("disabled draft");
+  } finally {
+    Date.now = originalDateNow;
+  }
+
+  assert.equal(dateCalls, 0);
+  assert.equal(runtime.undo.hasUndo(), false);
+  assert.deepEqual(runtime.undo.getHistory(), []);
+  assert.equal(runtime.undo.consume(), undefined);
+
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: true });
+  runtime.undo.store("enabled draft");
+  assert.equal(runtime.undo.hasUndo(), true);
+  assert.deepEqual(
+    runtime.undo.getHistory().map((entry) => entry.draft),
+    ["enabled draft"]
+  );
+
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: false });
+  assert.equal(runtime.undo.hasUndo(), false);
+  assert.deepEqual(runtime.undo.getHistory(), []);
+  assert.equal(runtime.undo.consume(), undefined);
+
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: true });
+  assert.deepEqual(runtime.undo.getHistory(), []);
+});
+
 void test("runtime restore clears transient undo state", () => {
   const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: true });
   runtime.undo.store("draft");
   runtime.rememberDraftResolution({
     intent: "implement",

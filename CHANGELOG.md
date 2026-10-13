@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0]
+
+### Changed
+
+* **prompton:** make prompt history and its shared undo buffer opt-in and disabled by default; disabling it clears session-only drafts, while Pi's own session logging remains unaffected
+* **settings:** replace the settings screen with an Atelier-style centered modal, inline toggles, and fallback-model controls; retain slash-command compatibility and immediate persistence
+
 ## [0.9.0]
 
 ### Changed

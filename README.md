@@ -34,7 +34,7 @@ Two output styles:
 | **Inline Annotations**     | None                                    | `[category: suggestion]` annotations without rewriting (`/prompton coach`)                   |
 | **Starter Templates**      | None                                    | 4 intent-based skeletons (`/prompton template`)                                              |
 | **Empty Editor Action**    | Opens settings dialog                   | Opens template picker dialog (both command & shortcut)                                       |
-| **Draft History / Undo**   | Single-entry undo (`/promptsmith undo`) | 10-entry ring buffer history (`/prompton history`) + `/prompton undo`                        |
+| **Draft History / Undo**   | Single-entry undo (`/promptsmith undo`) | Opt-in, session-only 10-entry history (`/prompton history`) + `/prompton undo`               |
 | **Token Estimation**       | None                                    | Token estimate (`~N tokens`) in enhancement notifications                                    |
 | **CLI Auto-Completions**   | Subcommands only                        | Subcommands + value completions (`auto-clarify on/off`, `family auto/gpt/claude`, etc.)      |
 | **Settings Migration**     | N/A                                     | Backward-compatible fallback for legacy `promptsmith-settings.json`                          |
@@ -87,9 +87,12 @@ Quoted input becomes the current editor draft. Run these through Pi's slash-comm
 
 ### Undo and history
 
-- `/prompton undo` restores the draft from before the last editor-changing action.
-- `/prompton history` restores one of the last 10 drafts changed in the current Pi session.
-- Pi's normal `Ctrl+Z` editor undo also remains available.
+Prompt history is off by default. Run `/prompton history on` to enable the shared session-only buffer used by both commands.
+
+- `/prompton undo` restores the draft from before the last editor-changing action when history is enabled.
+- `/prompton history` restores one of the last 10 drafts changed in the current Pi session when history is enabled.
+- `/prompton history off` disables tracking and clears buffered drafts.
+- Pi's normal `Ctrl+Z` editor undo and Pi's own session logging are unaffected.
 
 ## Rewrite modes
 
@@ -172,7 +175,7 @@ Verification
 
 ## Prompt coaching tools
 
-Prompton includes optional tools beyond the core rewriter. Editor-changing actions save the previous draft for `/prompton undo`.
+Prompton includes optional tools beyond the core rewriter. When prompt history is enabled, editor-changing actions save the previous draft for `/prompton undo`.
 
 ### Lint
 
@@ -224,14 +227,16 @@ When the editor is empty, both `/prompton` and the shortcut (`Alt+P`) open the s
 /prompton input           clear the editor for free-form input
 ```
 
-If the editor already contains text, either command asks before replacing it and saves the old draft to history. Inline drafts can be wrapped in double quotes, single quotes, or backticks for `/prompton`, `/prompton coach`, `/prompton lint`, `/prompton score`, and `/prompton clarify`.
+If the editor already contains text, either command asks before replacing it. The old draft is saved only when prompt history is enabled. Inline drafts can be wrapped in double quotes, single quotes, or backticks for `/prompton`, `/prompton coach`, `/prompton lint`, `/prompton score`, and `/prompton clarify`.
 
 ### History
 
-Prompton keeps the last 10 drafts changed during the current Pi session. Browse and restore any of them; the replaced editor text remains available to undo.
+Prompt history is opt-in, in memory only, and limited to the current Pi session. When enabled, Prompton keeps the last 10 replaced drafts; browsing history also keeps the replaced editor text available to undo. Disabling history clears the buffer so drafts do not reappear when it is re-enabled. This setting does not change Pi's own session logging.
 
 ```
-/prompton history
+/prompton history on     enable prompt history and undo
+/prompton history        browse and restore past drafts
+/prompton history off    disable tracking and clear buffered drafts
 ```
 
 ### Token estimate
@@ -244,7 +249,7 @@ After every enhancement, the success notification includes an approximate token 
 /prompton                    enhance current editor draft
 /prompton undo               restore pre-enhancement draft
 /prompton status             show configuration and runtime state
-/prompton settings           open interactive settings UI
+/prompton settings           open configuration modal (primary settings entry)
 /prompton reset-settings     restore global defaults
 /prompton lint               local prompt lint (instant, no LLM)
 /prompton score              LLM-based quality rating (1-5)
@@ -254,11 +259,12 @@ After every enhancement, the success notification includes an approximate token 
 /prompton clarify-on-shortcut on|off   toggle clarify on shortcut
 /prompton template           pick a prompt skeleton
 /prompton input              clear editor for free-form prompt entry
-/prompton history            browse and restore past drafts
+/prompton history            browse and restore past drafts when enabled
+/prompton history on|off     toggle session-only prompt history and undo
 /prompton help               show commands with short descriptions
 ```
 
-Quick config:
+Prefer `/prompton settings` for configuration. Existing quick-config commands remain supported:
 
 ```
 /prompton enable
@@ -286,16 +292,25 @@ Quick config:
 
 ### Interactive settings UX
 
-- Lists wrap at top and bottom; large lists are paginated
-- Press `/` to search in compact selector; `PageUp`/`PageDown` to page
-- Shortcut row: toggle on/off, remap, or reset to `Alt+P`
-- Auto-send toggle: submit refined prompt immediately after rewriting
-- Auto-send when busy: `steer` or `follow-up`
+- `/prompton settings` opens a centered, themed modal; changes save immediately, not on close
+- `↑`/`↓` navigate and scroll (wrap at either end); type to search, `Backspace` edits search
+- `Enter` toggles the selected checkbox or opens its selector; `Space` does the same when search is empty
+- `Esc` (or `Ctrl+C`) and the **Done** row close; closing does not undo already saved changes
+- Secondary selectors temporarily hide the modal, then restore its search and selection
+- Secondary selectors retain `/` search and `PageUp`/`PageDown` paging; `Esc` cancels without saving
+- Keyboard shortcut toggles inline; **Shortcut keybinding** remaps or resets to `Alt+P`
 - Remapping: press new combo directly; `Esc` cancels, `Backspace` resets
+- Fallback chain: add models at the end, select an entry to remove/move up/move down, or clear the chain
+- Prompt history and undo remain off by default; disabling clears the session-only buffer. Without history, editor replacements cannot be undone by Prompton
+- Jev scoring and intent verification are separate opt-in toggles, both off by default; they call an external service when configured
+- Auto-send submits the refined prompt immediately; **Auto-send while busy** chooses `steer` or `follow-up` (used only when auto-send is on)
+- The modal requires interactive TUI mode; RPC/print clients can use the existing configuration commands
 
 ## Settings
 
 Stored at `~/.pi/agent/prompton-settings.json`. On first use after upgrading from Promptsmith, Prompton also reads the legacy `promptsmith-settings.json` file as a fallback.
+
+Set the JSON key `historyEnabled` to `true` to opt in to prompt history and undo. Its default is `false`; omitted or invalid values resolve to `false`.
 
 | Setting                  | Default    |
 | ------------------------ | ---------- |
@@ -313,6 +328,7 @@ Stored at `~/.pi/agent/prompton-settings.json`. On first use after upgrading fro
 | enhancement timeout      | `45s`      |
 | clarify before enhancing | `off`      |
 | clarify on shortcut      | `off`      |
+| prompt history and undo  | `off`      |
 
 ## Context
 
@@ -356,6 +372,7 @@ Enhancer model modes: `active`, `fixed`, `family-linked`. Optional fallback mode
 - Collapsed Pi paste markers recovered from clipboard where possible; multi-marker drafts fail closed
 - Oversized drafts fail clearly instead of silent truncation
 - Intent detection uses Jev when configured, with deterministic local fallback and no added enhancement model call
+- Prompt history and undo are disabled by default; when enabled, drafts stay in a session-only in-memory buffer and are not written to the settings file. Pi's own session logging is unaffected
 - `jevScoringEnabled` (default off): score command uses Jev's typed Score judgment for the 1-5 rating, falling back to the enhancer model's own parsed rating when unset, unconfigured, or unavailable
 - `jevVerificationEnabled` (default off): enhanced rewrites are checked with Jev for dropped/contradicted intent before acceptance; unavailable or uncertain Jev fails open (never blocks a structurally valid rewrite). Both are opt-in since they call an external service and must not activate just because an unrelated tool's Jev credential exists on the machine
 

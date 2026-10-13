@@ -1,17 +1,20 @@
-import type { SelectDialogItem } from "./select-dialog.js";
+import type { SettingItem } from "@earendil-works/pi-tui";
 import { formatShortcutKey } from "../shortcut-key.js";
 import type { ModelRef, PromptonAutoSendBusyBehavior, PromptonSettings } from "../types.js";
 
 export type SettingsMenuOptionId =
   | "enabled"
   | "shortcutEnabled"
+  | "shortcutKey"
   | "statusBarEnabled"
+  | "historyEnabled"
   | "targetFamilyMode"
   | "fallbackFamily"
   | "enhancerModelMode"
   | "fixedEnhancerModel"
   | "gptEnhancerModel"
   | "claudeEnhancerModel"
+  | "fallbackEnhancerModels"
   | "includeRecentConversation"
   | "includeProjectMetadata"
   | "enhancementTimeoutMs"
@@ -25,8 +28,28 @@ export type SettingsMenuOptionId =
   | "familyOverrides"
   | "clarifyEnabled"
   | "clarifyOnShortcut"
+  | "jevScoringEnabled"
+  | "jevVerificationEnabled"
   | "reset"
   | "done";
+
+export type SettingsMenuItem = SettingItem & { id: SettingsMenuOptionId };
+
+export const SETTINGS_TOGGLE_IDS = [
+  "enabled",
+  "shortcutEnabled",
+  "statusBarEnabled",
+  "historyEnabled",
+  "includeRecentConversation",
+  "includeProjectMetadata",
+  "previewBeforeReplace",
+  "autoSendEnhancedPrompt",
+  "preserveCodeBlocks",
+  "clarifyEnabled",
+  "clarifyOnShortcut",
+  "jevScoringEnabled",
+  "jevVerificationEnabled",
+] as const;
 
 export const TARGET_FAMILY_OPTIONS = [
   "auto — universal model-agnostic rewrite",
@@ -64,25 +87,37 @@ export const FAMILY_OPTIONS = [
 
 export function buildSettingsMenuOptions(
   settings: PromptonSettings
-): Partial<Record<SettingsMenuOptionId, SelectDialogItem>> {
+): Record<SettingsMenuOptionId, SettingsMenuItem> {
   return {
     enabled: createSettingsMenuItem(
       "enabled",
       "Prompt enhancement",
-      onOff(settings.enabled),
+      toggleValue(settings.enabled),
       "Master switch for /prompton and the keyboard shortcut."
     ),
     shortcutEnabled: createSettingsMenuItem(
       "shortcutEnabled",
       "Keyboard shortcut",
-      `${onOff(settings.shortcutEnabled)} · ${formatShortcutKey(settings.shortcutKey)}`,
-      "Run Prompton directly from the editor. Change the key combo or turn it off."
+      toggleValue(settings.shortcutEnabled),
+      "Run Prompton directly from the editor."
+    ),
+    shortcutKey: createSettingsMenuItem(
+      "shortcutKey",
+      "Shortcut keybinding",
+      formatShortcutKey(settings.shortcutKey),
+      "Change the key combo or reset to Alt+P."
     ),
     statusBarEnabled: createSettingsMenuItem(
       "statusBarEnabled",
       "Footer status bar",
-      onOff(settings.statusBarEnabled),
+      toggleValue(settings.statusBarEnabled),
       "Show compact live Prompton status in the footer."
+    ),
+    historyEnabled: createSettingsMenuItem(
+      "historyEnabled",
+      "Prompt history and undo",
+      toggleValue(settings.historyEnabled),
+      "Off by default. Without history, Prompton cannot undo replacements. Turning off clears the 10-draft session buffer."
     ),
     targetFamilyMode: createSettingsMenuItem(
       "targetFamilyMode",
@@ -120,16 +155,22 @@ export function buildSettingsMenuOptions(
       formatModelRef(settings.familyEnhancerModels?.claude),
       "Used only when enhancer model choice is family-linked."
     ),
+    fallbackEnhancerModels: createSettingsMenuItem(
+      "fallbackEnhancerModels",
+      "Enhancer fallback chain",
+      settings.fallbackEnhancerModels?.map(formatModelRef).join(" → ") || "Off",
+      "Models tried in order after primary format or provider failures. Add, remove, reorder, or clear."
+    ),
     includeRecentConversation: createSettingsMenuItem(
       "includeRecentConversation",
       "Recent chat context",
-      onOff(settings.includeRecentConversation),
+      toggleValue(settings.includeRecentConversation),
       "More thread-aware rewrites, but usually slower."
     ),
     includeProjectMetadata: createSettingsMenuItem(
       "includeProjectMetadata",
       "Project metadata",
-      onOff(settings.includeProjectMetadata),
+      toggleValue(settings.includeProjectMetadata),
       "Include cwd and git branch when available."
     ),
     enhancementTimeoutMs: createSettingsMenuItem(
@@ -153,29 +194,25 @@ export function buildSettingsMenuOptions(
     previewBeforeReplace: createSettingsMenuItem(
       "previewBeforeReplace",
       "Review before replacing editor",
-      onOff(settings.previewBeforeReplace),
+      toggleValue(settings.previewBeforeReplace),
       "Open a review step before overwriting the current draft."
     ),
     autoSendEnhancedPrompt: createSettingsMenuItem(
       "autoSendEnhancedPrompt",
       "Auto-send refined prompt",
-      onOff(settings.autoSendEnhancedPrompt),
+      toggleValue(settings.autoSendEnhancedPrompt),
       "After refinement, submit the final prompt immediately instead of leaving it in the editor."
     ),
-    ...(settings.autoSendEnhancedPrompt
-      ? {
-          autoSendBusyBehavior: createSettingsMenuItem(
-            "autoSendBusyBehavior",
-            "Auto-send while busy",
-            describeAutoSendBusyBehavior(settings.autoSendBusyBehavior),
-            "When Pi is already running, choose whether the refined prompt interrupts next or waits as a follow-up."
-          ),
-        }
-      : {}),
+    autoSendBusyBehavior: createSettingsMenuItem(
+      "autoSendBusyBehavior",
+      "Auto-send while busy",
+      describeAutoSendBusyBehavior(settings.autoSendBusyBehavior),
+      "Used only when auto-send is on. Steer after the current tool batch or wait as a follow-up."
+    ),
     preserveCodeBlocks: createSettingsMenuItem(
       "preserveCodeBlocks",
       "Keep code blocks unchanged",
-      onOff(settings.preserveCodeBlocks),
+      toggleValue(settings.preserveCodeBlocks),
       "Preserve fenced code blocks when possible."
     ),
     exactModelOverrides: createSettingsMenuItem(
@@ -193,23 +230,37 @@ export function buildSettingsMenuOptions(
     clarifyEnabled: createSettingsMenuItem(
       "clarifyEnabled",
       "Clarify before enhancing",
-      onOff(settings.clarifyEnabled),
+      toggleValue(settings.clarifyEnabled),
       "Show a single clarification dialog (lint + intent suggestions) before enhancing."
     ),
     clarifyOnShortcut: createSettingsMenuItem(
       "clarifyOnShortcut",
       "Clarify on shortcut",
-      onOff(settings.clarifyOnShortcut),
+      toggleValue(settings.clarifyOnShortcut),
       "Also show clarification dialog when triggered via the keyboard shortcut."
     ),
+    jevScoringEnabled: createSettingsMenuItem(
+      "jevScoringEnabled",
+      "Jev quality scoring",
+      toggleValue(settings.jevScoringEnabled),
+      "Opt in to external TypeSafe Jev scoring. Requires a configured credential; otherwise uses existing scoring."
+    ),
+    jevVerificationEnabled: createSettingsMenuItem(
+      "jevVerificationEnabled",
+      "Jev intent verification",
+      toggleValue(settings.jevVerificationEnabled),
+      "Opt in to external TypeSafe Jev intent checks. Unavailable or uncertain checks do not block rewrites."
+    ),
     reset: {
-      value: "reset",
+      id: "reset",
       label: "Reset saved settings",
+      currentValue: "Reset…",
       description: "Restore Prompton settings to defaults.",
     },
     done: {
-      value: "done",
+      id: "done",
       label: "Done",
+      currentValue: "Close",
       description: "Close Prompton settings.",
     },
   };
@@ -327,11 +378,15 @@ function createSettingsMenuItem(
   label: string,
   currentValue: string,
   description: string
-): SelectDialogItem {
+): SettingsMenuItem {
   return {
-    value,
-    label: `${label} · ${currentValue}`,
+    id: value,
+    label,
+    currentValue,
     description,
+    ...(SETTINGS_TOGGLE_IDS.some((id) => id === value)
+      ? { values: [toggleValue(false), toggleValue(true)] }
+      : {}),
   };
 }
 
@@ -339,8 +394,8 @@ function formatModelRef(modelRef: ModelRef | undefined): string {
   return modelRef ? `${modelRef.provider}/${modelRef.id}` : "Unset";
 }
 
-function onOff(value: boolean): string {
-  return value ? "On" : "Off";
+export function toggleValue(value: boolean): string {
+  return value ? "[x] On" : "[ ] Off";
 }
 
 function capitalize(value: string): string {

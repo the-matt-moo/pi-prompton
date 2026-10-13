@@ -76,7 +76,16 @@ export async function runSettingsAction(
         (next) => `Prompton is now ${next.enabled ? "on" : "off"}.`
       );
       return;
-    case "shortcutEnabled": {
+    case "shortcutEnabled":
+      persistSettings(
+        ctx,
+        runtime,
+        services,
+        (latest) => ({ ...latest, shortcutEnabled: !latest.shortcutEnabled }),
+        (next) => `Keyboard shortcut is now ${next.shortcutEnabled ? "on" : "off"}.`
+      );
+      return;
+    case "shortcutKey": {
       const shortcutChoice = await selectOption(
         ctx,
         "Keyboard shortcut",
@@ -262,6 +271,9 @@ export async function runSettingsAction(
       }
       return;
     }
+    case "fallbackEnhancerModels":
+      await manageFallbackModels(ctx, runtime, services);
+      return;
     case "includeRecentConversation":
       persistSettings(
         ctx,
@@ -293,6 +305,15 @@ export async function runSettingsAction(
         services,
         (latest) => ({ ...latest, statusBarEnabled: !latest.statusBarEnabled }),
         (next) => `Status bar is now ${next.statusBarEnabled ? "on" : "off"}.`
+      );
+      return;
+    case "historyEnabled":
+      persistSettings(
+        ctx,
+        runtime,
+        services,
+        (latest) => ({ ...latest, historyEnabled: !latest.historyEnabled }),
+        (next) => `Prompt history and undo are now ${next.historyEnabled ? "on" : "off"}.`
       );
       return;
     case "enhancementTimeoutMs": {
@@ -420,6 +441,17 @@ export async function runSettingsAction(
         services,
         (latest) => ({ ...latest, clarifyOnShortcut: !latest.clarifyOnShortcut }),
         (next) => `Clarify on shortcut is now ${next.clarifyOnShortcut ? "on" : "off"}.`
+      );
+      return;
+    case "jevScoringEnabled":
+    case "jevVerificationEnabled":
+      persistSettings(
+        ctx,
+        runtime,
+        services,
+        (latest) => ({ ...latest, [choice]: !latest[choice] }),
+        (next) =>
+          `${choice === "jevScoringEnabled" ? "Jev quality scoring" : "Jev intent verification"} is now ${next[choice] ? "on" : "off"}.`
       );
       return;
     case "reset":
@@ -606,6 +638,105 @@ async function managePatternOverrides(
       default:
         break;
     }
+  }
+}
+
+async function manageFallbackModels(
+  ctx: ExtensionContext,
+  runtime: PromptonRuntimeState,
+  services: SettingsUiServices
+): Promise<void> {
+  while (true) {
+    const models = runtime.getSettings().fallbackEnhancerModels ?? [];
+    const choice = await selectOption(ctx, "Enhancer fallback chain (tried top to bottom)", [
+      { value: "add", label: "Add model", description: "Append to the end of the chain" },
+      ...models.map((model, index) => ({
+        value: String(index),
+        label: `${index + 1}. ${model.provider}/${model.id}`,
+        description: "Remove or move this model",
+      })),
+      ...(models.length ? [{ value: "clear", label: "Clear chain" }] : []),
+      { value: "back", label: "Back" },
+    ]);
+    if (choice === undefined || choice === "back") return;
+    if (choice === "add") {
+      const model = await chooseModelRef(ctx, "Add a fallback enhancer model");
+      if (!model) continue;
+      if (
+        runtime
+          .getSettings()
+          .fallbackEnhancerModels?.some(
+            (entry) =>
+              normalize(`${entry.provider}/${entry.id}`) ===
+              normalize(`${model.provider}/${model.id}`)
+          )
+      ) {
+        ctx.ui.notify("That model is already in the fallback chain.", "warning");
+        continue;
+      }
+      persistSettings(
+        ctx,
+        runtime,
+        services,
+        (latest) => ({
+          ...latest,
+          fallbackEnhancerModels: [...(latest.fallbackEnhancerModels ?? []), model],
+        }),
+        "Fallback model added."
+      );
+      continue;
+    }
+    let action = choice;
+    const index = Number(choice);
+    if (choice !== "clear") {
+      if (!Number.isInteger(index) || !models[index]) continue;
+      action =
+        (await selectOption(
+          ctx,
+          `Fallback ${index + 1}: ${models[index].provider}/${models[index].id}`,
+          [
+            "Remove",
+            ...(index > 0 ? ["Move up"] : []),
+            ...(index < models.length - 1 ? ["Move down"] : []),
+            "Back",
+          ]
+        )) ?? "Back";
+      if (!["Remove", "Move up", "Move down"].includes(action)) continue;
+    }
+    const selected = models[index];
+    persistSettings(
+      ctx,
+      runtime,
+      services,
+      (latest) => {
+        const chain = [...(latest.fallbackEnhancerModels ?? [])];
+        if (action === "clear") chain.length = 0;
+        else if (selected) {
+          const currentIndex = chain.findIndex(
+            (entry) =>
+              normalize(`${entry.provider}/${entry.id}`) ===
+              normalize(`${selected.provider}/${selected.id}`)
+          );
+          if (currentIndex >= 0) {
+            if (action === "Remove") chain.splice(currentIndex, 1);
+            else {
+              const destination = currentIndex + (action === "Move up" ? -1 : 1);
+              if (chain[currentIndex] && chain[destination]) {
+                [chain[currentIndex], chain[destination]] = [
+                  chain[destination],
+                  chain[currentIndex],
+                ];
+              }
+            }
+          }
+        }
+        const next = { ...latest };
+        if (chain.length) next.fallbackEnhancerModels = chain;
+        else delete next.fallbackEnhancerModels;
+        return next;
+      },
+      "Enhancer fallback chain updated."
+    );
   }
 }
 

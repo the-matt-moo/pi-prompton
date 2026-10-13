@@ -207,7 +207,18 @@ export async function handlePromptonCommand(
         await runTemplateCommand(ctx, runtime);
         return;
       case "history":
-        await runHistoryCommand(ctx, runtime);
+        if (command.args.length === 0) {
+          await runHistoryCommand(ctx, runtime);
+          return;
+        }
+        handleBooleanSettingCommand(
+          command,
+          ctx,
+          runtime,
+          services,
+          "historyEnabled",
+          "Prompt history setting updated."
+        );
         return;
       case "help":
       default:
@@ -295,6 +306,7 @@ export function getPromptonArgumentCompletions(
     "preserve-code": ["on", "off"],
     "auto-clarify": ["on", "off"],
     "clarify-on-shortcut": ["on", "off"],
+    history: ["on", "off"],
   };
   const [command] = loweredPrefix.trimStart().split(/\s+/, 1);
   const candidates = prefix.includes(" ")
@@ -312,6 +324,10 @@ function handleUndo(
   const support = detectRuntimeSupport(ctx);
   if (!support.interactiveTui) {
     throw new Error(support.reason);
+  }
+
+  if (!runtime.getSettings().historyEnabled) {
+    throw new Error("Prompt history tracking is disabled. Enable it with /prompton history on.");
   }
 
   const previousDraft = runtime.undo.consume();
@@ -638,7 +654,8 @@ type BooleanSettingKey =
   | "autoSendEnhancedPrompt"
   | "preserveCodeBlocks"
   | "clarifyEnabled"
-  | "clarifyOnShortcut";
+  | "clarifyOnShortcut"
+  | "historyEnabled";
 
 function notify(
   ctx: { hasUI: boolean; ui: { notify: (message: string, type?: "info" | "error") => void } },

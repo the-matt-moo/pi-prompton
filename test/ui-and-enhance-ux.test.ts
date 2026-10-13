@@ -483,6 +483,31 @@ void test("settings actions persist against the latest runtime snapshot", async 
   assert.equal(runtime.getSettings().statusBarEnabled, true);
 });
 
+void test("settings action toggles prompt history and clears buffered drafts when disabled", async () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: true });
+  runtime.undo.store("saved draft");
+  const ctx = createCommandContext();
+
+  await runSettingsAction("historyEnabled", {
+    ctx,
+    runtime,
+    services: { refreshStatus: () => undefined },
+  });
+
+  assert.equal(runtime.getSettings().historyEnabled, false);
+  assert.equal(runtime.undo.hasUndo(), false);
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /history and undo are now off/i);
+
+  await runSettingsAction("historyEnabled", {
+    ctx,
+    runtime,
+    services: { refreshStatus: () => undefined },
+  });
+  assert.equal(runtime.getSettings().historyEnabled, true);
+  assert.deepEqual(runtime.undo.getHistory(), []);
+});
+
 void test("settings actions let users choose auto-send behavior while busy", async () => {
   const runtime = createRuntimeState();
   const ctx = createCommandContext({

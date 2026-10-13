@@ -43,6 +43,7 @@ export interface MockUiState {
   customOptionsHistory: string[][];
   customRenderHistory: string[][];
   customInputSequence: string[];
+  confirmations: { title: string; message: string }[];
   editorComponentHistory: EditorComponentHistoryEntry[];
   themeCount: number;
 }
@@ -213,6 +214,7 @@ export function createModel(overrides?: Partial<Model<Api>>): Model<Api> {
 
 export function createCommandContext(options?: {
   hasUI?: boolean;
+  mode?: ExtensionContext["mode"];
   editorText?: string;
   editorResponse?: string;
   nextSelectValue?: string;
@@ -242,6 +244,7 @@ export function createCommandContext(options?: {
     customOptionsHistory: [],
     customRenderHistory: [],
     customInputSequence: [...(options?.customInputSequence ?? [])],
+    confirmations: [],
     editorComponentHistory: [],
     themeCount: options?.themeCount ?? 1,
   };
@@ -254,6 +257,7 @@ export function createCommandContext(options?: {
 
   const ctx = {
     hasUI: options?.hasUI ?? true,
+    mode: options?.mode ?? "tui",
     cwd: options?.cwd ?? `/tmp/project-${Math.random().toString(36).slice(2)}`,
     model: options?.model,
     sessionManager: {
@@ -306,7 +310,7 @@ export function createCommandContext(options?: {
               render?: (width: number) => string[];
               handleInput?: (data: string) => void;
               title?: string;
-              allItems?: { value: string; label: string }[];
+              allItems?: { value?: string; label: string; currentValue?: string }[];
               onDone?: (value: string | undefined) => void;
               dispose?: () => void;
             }
@@ -338,7 +342,7 @@ export function createCommandContext(options?: {
           typeof factory === "function"
             ? (
                 factory as (
-                  tui: { requestRender: () => void },
+                  tui: { requestRender: () => void; terminal: { rows: number } },
                   theme: {
                     fg: (color: string, text: string) => string;
                     bg: (color: string, text: string) => string;
@@ -352,7 +356,7 @@ export function createCommandContext(options?: {
                   done: (value: unknown) => void
                 ) => { render?: (width: number) => string[]; handleInput?: (data: string) => void }
               )(
-                { requestRender: captureRender },
+                { requestRender: captureRender, terminal: { rows: 40 } },
                 theme,
                 createMockKeybindings(options?.keybindingsConfig),
                 done
@@ -363,7 +367,7 @@ export function createCommandContext(options?: {
           render?: (width: number) => string[];
           handleInput?: (data: string) => void;
           title?: string;
-          allItems?: { value: string; label: string }[];
+          allItems?: { value?: string; label: string; currentValue?: string }[];
           onDone?: (value: string | undefined) => void;
           dispose?: () => void;
         };
@@ -377,7 +381,9 @@ export function createCommandContext(options?: {
         }
         if (Array.isArray(customComponent.allItems)) {
           uiState.customOptionsHistory.push(
-            customComponent.allItems.map((item) => item.label ?? item.value)
+            customComponent.allItems.map((item) =>
+              item.currentValue !== undefined ? `${item.label} · ${item.currentValue}` : item.label
+            )
           );
         }
         captureRender();
@@ -413,7 +419,10 @@ export function createCommandContext(options?: {
           resolveResult = resolve;
         });
       },
-      confirm: () => Promise.resolve(options?.nextConfirmValue ?? false),
+      confirm: (title: string, message: string) => {
+        uiState.confirmations.push({ title, message });
+        return Promise.resolve(options?.nextConfirmValue ?? false);
+      },
       onTerminalInput: () => () => undefined,
       setWorkingMessage: () => undefined,
       setWidget: () => undefined,

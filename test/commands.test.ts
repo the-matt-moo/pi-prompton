@@ -6,6 +6,7 @@ import {
   parsePromptonCommand,
 } from "../src/commands.js";
 import { HELP_LINES } from "../src/constants.js";
+import { runHistoryCommand } from "../src/coaching-commands.js";
 import { handlePromptonShortcut } from "../src/shortcut.js";
 import { openSettingsUi } from "../src/ui/settings.js";
 import {
@@ -92,6 +93,10 @@ void test("argument completions expose commands and common values", () => {
   assert.deepEqual(getPromptonArgumentCompletions("enhancer-model fall"), [
     { value: "enhancer-model fallback", label: "enhancer-model fallback" },
   ]);
+  assert.deepEqual(getPromptonArgumentCompletions("history o"), [
+    { value: "history on", label: "history on" },
+    { value: "history off", label: "history off" },
+  ]);
 });
 
 void test("help entries include short descriptions", () => {
@@ -100,6 +105,10 @@ void test("help entries include short descriptions", () => {
   assert.match(HELP_LINES, /\/prompton enhancer-model active — use the active model/);
   assert.match(HELP_LINES, /\/prompton enhancer-model fixed/);
   assert.match(HELP_LINES, /\/prompton enhancer-model fallback/);
+  assert.match(
+    HELP_LINES,
+    /\/prompton history on\|off — toggle session-only prompt history and undo/
+  );
   // family-linked and map are intentionally hidden from short help
   assert.doesNotMatch(HELP_LINES, /family-linked/);
   assert.doesNotMatch(HELP_LINES, /map active/);
@@ -309,18 +318,19 @@ void test("settings ui shows clearer labels and the footer status toggle", async
   await openSettingsUi(ctx, runtime, { refreshStatus: () => undefined });
 
   const firstMenu = ctx.uiState.customOptionsHistory[0] ?? [];
-  assert.ok(firstMenu.some((option) => /Prompt enhancement · On/i.test(option)));
-  assert.ok(firstMenu.some((option) => /Keyboard shortcut · On · Alt\+P/i.test(option)));
-  assert.ok(firstMenu.some((option) => /Footer status bar · Off/i.test(option)));
-  assert.ok(firstMenu.some((option) => /Auto-send refined prompt · Off/i.test(option)));
-  assert.ok(!firstMenu.some((option) => /Auto-send while busy · Steer/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Prompt enhancement · \[x\] On/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Keyboard shortcut · \[x\] On/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Footer status bar · \[ \] Off/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Prompt history and undo · \[ \] Off/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Auto-send refined prompt · \[ \] Off/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Auto-send while busy · Steer/i.test(option)));
   assert.ok(firstMenu.some((option) => /Rewrite mode · Auto/i.test(option)));
 
   const initialRender = ctx.uiState.customRenderHistory[0]?.join("\n") ?? "";
   assert.match(initialRender, /Master switch for \/prompton and the keyboard shortcut/i);
 });
 
-void test("settings ui shows the busy auto-send row only when auto-send is on", async () => {
+void test("settings ui retains the busy auto-send row when auto-send is on", async () => {
   const runtime = createRuntimeState();
   runtime.replaceSettings({ ...runtime.getSettings(), autoSendEnhancedPrompt: true });
   const ctx = createCommandContext({ model: createModel(), nextSelectValue: "done" });
@@ -328,7 +338,7 @@ void test("settings ui shows the busy auto-send row only when auto-send is on", 
   await openSettingsUi(ctx, runtime, { refreshStatus: () => undefined });
 
   const firstMenu = ctx.uiState.customOptionsHistory[0] ?? [];
-  assert.ok(firstMenu.some((option) => /Auto-send refined prompt · On/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Auto-send refined prompt · \[x\] On/i.test(option)));
   assert.ok(firstMenu.some((option) => /Auto-send while busy · Steer/i.test(option)));
 });
 
@@ -647,8 +657,171 @@ void test("score command times out without changing the editor", async () => {
   assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /timed out/i);
 });
 
+void test("replacement confirmations warn when the current draft will not be saved", async () => {
+  const harness = createMockPi();
+  const services = createServices(harness, () => Promise.resolve(createCompleteResponse("unused")));
+  const templateRuntime = createRuntimeState();
+  const templateCtx = createCommandContext({
+    model: createModel(),
+    editorText: "template draft",
+    nextConfirmValue: false,
+  });
+
+  await handlePromptonCommand("template", templateCtx, templateRuntime, services);
+  assert.match(templateCtx.uiState.confirmations[0]?.message ?? "", /will NOT be saved/);
+
+  const inputRuntime = createRuntimeState();
+  const inputCtx = createCommandContext({
+    model: createModel(),
+    editorText: "input draft",
+    nextConfirmValue: false,
+  });
+
+  await handlePromptonCommand("input", inputCtx, inputRuntime, services);
+  assert.match(inputCtx.uiState.confirmations[0]?.message ?? "", /will NOT be saved/);
+
+  inputRuntime.replaceSettings({ ...inputRuntime.getSettings(), historyEnabled: true });
+  const enabledCtx = createCommandContext({
+    model: createModel(),
+    editorText: "saved draft",
+    nextConfirmValue: false,
+  });
+  await handlePromptonCommand("input", enabledCtx, inputRuntime, services);
+  assert.equal(
+    enabledCtx.uiState.confirmations[0]?.message,
+    "The current editor text will be saved to undo history."
+  );
+});
+
+void test("default-off history bypasses every editor-writing recording path", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const services = createServices(harness, () =>
+    Promise.resolve(createCompleteResponse("enhanced draft"))
+  );
+
+  const enhancementCtx = createCommandContext({
+    model: createModel(),
+    editorText: "enhancement draft",
+  });
+  await handlePromptonCommand("", enhancementCtx, runtime, services);
+  assert.deepEqual(runtime.undo.getHistory(), []);
+
+  const clarifyCtx = createCommandContext({
+    model: createModel(),
+    editorText: "fix it",
+    nextSelectValue: "Scope: single file change only.",
+  });
+  await handlePromptonCommand("clarify", clarifyCtx, runtime, services);
+  assert.notEqual(clarifyCtx.uiState.editorText, "fix it");
+  assert.deepEqual(runtime.undo.getHistory(), []);
+
+  const coachCtx = createCommandContext({ model: createModel(), editorText: "fix it" });
+  await handlePromptonCommand(
+    "coach",
+    coachCtx,
+    runtime,
+    createServices(harness, () =>
+      Promise.resolve(createCompleteResponse("fix it [vague: specify the target]"))
+    )
+  );
+  assert.match(coachCtx.uiState.editorText, /\[vague:/);
+  assert.deepEqual(runtime.undo.getHistory(), []);
+
+  const templateCtx = createCommandContext({
+    model: createModel(),
+    editorText: "template draft",
+    nextSelectValue: "implement",
+    nextConfirmValue: true,
+  });
+  await handlePromptonCommand("template", templateCtx, runtime, services);
+  assert.match(templateCtx.uiState.editorText, /^Implement:/);
+  assert.deepEqual(runtime.undo.getHistory(), []);
+
+  const inputCtx = createCommandContext({
+    model: createModel(),
+    editorText: "input draft",
+    nextConfirmValue: true,
+  });
+  await handlePromptonCommand("input", inputCtx, runtime, services);
+  assert.equal(inputCtx.uiState.editorText, "");
+  assert.deepEqual(runtime.undo.getHistory(), []);
+
+  runtime.replaceSettings({ ...runtime.getSettings(), clarifyEnabled: true });
+  const autoClarifyCtx = createCommandContext({
+    model: createModel(),
+    editorText: "fix it",
+    nextSelectValue: "Scope: single file change only.",
+  });
+  await handlePromptonCommand("", autoClarifyCtx, runtime, services);
+  assert.equal(autoClarifyCtx.uiState.editorText, "enhanced draft");
+  assert.deepEqual(runtime.undo.getHistory(), []);
+
+  const historyCtx = createCommandContext({ model: createModel(), editorText: "keep this" });
+  await handlePromptonCommand("history", historyCtx, runtime, services);
+  assert.equal(historyCtx.uiState.editorText, "keep this");
+  assert.match(
+    historyCtx.uiState.notifications.at(-1)?.message ?? "",
+    /history tracking is disabled/i
+  );
+
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: true });
+  assert.deepEqual(runtime.undo.getHistory(), []);
+});
+
+void test("history and undo report disabled tracking and the command toggle updates status", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel(), editorText: "current draft" });
+  const services = createServices(harness, () => Promise.resolve(createCompleteResponse("unused")));
+
+  await handlePromptonCommand("history", ctx, runtime, services);
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /history tracking is disabled/i);
+
+  await handlePromptonCommand("undo", ctx, runtime, services);
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /history tracking is disabled/i);
+
+  await handlePromptonCommand("history on", ctx, runtime, services);
+  assert.equal(runtime.getSettings().historyEnabled, true);
+  runtime.undo.store("saved draft");
+
+  await handlePromptonCommand("history off", ctx, runtime, services);
+  assert.equal(runtime.getSettings().historyEnabled, false);
+
+  await handlePromptonCommand("status", ctx, runtime, services);
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /prompt history enabled: false/i);
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /undo available: false/i);
+
+  await handlePromptonCommand("history on", ctx, runtime, services);
+  assert.deepEqual(runtime.undo.getHistory(), []);
+});
+
+void test("history picker does not restore a captured entry after tracking is disabled", async () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: true });
+  runtime.undo.store("older draft");
+  const ctx = createCommandContext({ editorText: "current draft" });
+  let resolveSelection: ((choice: string | undefined) => void) | undefined;
+  Object.assign(ctx.ui, {
+    custom: () =>
+      new Promise<string | undefined>((resolve) => {
+        resolveSelection = resolve;
+      }),
+  });
+
+  const pending = runHistoryCommand(ctx, runtime);
+  await Promise.resolve();
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: false });
+  resolveSelection?.("0");
+  await pending;
+
+  assert.equal(ctx.uiState.editorText, "current draft");
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /disabled.*not restored/i);
+});
+
 void test("history restoration keeps the replaced draft available to undo", async () => {
   const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: true });
   runtime.undo.store("older draft");
   const harness = createMockPi();
   const ctx = createCommandContext({
@@ -1062,6 +1235,7 @@ void test("timeout command rejects values outside the supported range", async ()
 
 void test("undo restores the previous draft after successful enhancement", async () => {
   const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), historyEnabled: true });
   const harness = createMockPi();
   const ctx = createCommandContext({ model: createModel(), editorText: "first draft" });
   const services = createServices(harness, () =>

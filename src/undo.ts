@@ -8,7 +8,11 @@ export interface HistoryEntry {
 export class UndoManager {
   private readonly history: HistoryEntry[] = [];
 
+  constructor(private readonly isEnabled: () => boolean = () => true) {}
+
   store(draft: string): void {
+    if (!this.isEnabled()) return;
+
     this.history.push({ draft, timestamp: Date.now() });
     if (this.history.length > MAX_HISTORY) {
       this.history.shift();
@@ -16,16 +20,18 @@ export class UndoManager {
   }
 
   hasUndo(): boolean {
-    return this.history.length > 0;
+    return this.isEnabled() && this.history.length > 0;
   }
 
   consume(): string | undefined {
+    if (!this.isEnabled()) return undefined;
+
     const entry = this.history.pop();
     return entry?.draft;
   }
 
   getHistory(): HistoryEntry[] {
-    return [...this.history];
+    return this.isEnabled() ? [...this.history] : [];
   }
 
   clear(): void {
