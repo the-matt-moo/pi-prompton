@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.1] - 15-10-2026
+
+### Changed
+
+* **compatibility:** test against Pi 1.3.0 while retaining Pi 1.x peer compatibility; update pnpm release-age excludes
+
 ## [0.10.0]
 
 ### Changed

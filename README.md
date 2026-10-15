@@ -41,7 +41,7 @@ Two output styles:
 
 ## Installation
 
-> Requires Pi 1.x (tested with Pi 1.0.0).
+> Requires Pi 1.x (tested with Pi 1.3.0).
 
 Run once without installing:
 
